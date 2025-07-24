@@ -2,13 +2,12 @@
 
 
 
-```markdown
+
 # OMNIVIEW
 
 **AI-Powered Satellite Image Analysis Software**  
 Built with Electron (Frontend) + Python (Backend) for real-time geospatial intelligence and image analysis.
 
----
 
 ## 🧩 Project Structure
 
@@ -25,10 +24,7 @@ omniview/
 │   └── ...
 └── README.md
 
-````
-
----
-
+```
 ## ⚙️ Prerequisites
 
 - **Node.js** (v16+ recommended)
@@ -37,7 +33,7 @@ omniview/
 - **Git** (optional)
 - **Docker** (optional for containerized setup)
 
----
+
 
 ## 🚀 Setup Instructions
 
@@ -46,11 +42,11 @@ omniview/
 ```bash
 git clone https://github.com/yourusername/omniview.git
 cd omniview
-````
+```
 
----
 
-### 2. Set Up the Backend (Python)
+
+## 2. Set Up the Backend (Python)
 
 ```bash
 cd backend
