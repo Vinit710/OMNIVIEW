@@ -1,6 +1,6 @@
-Here's an updated `README.md` for your **OMNIVIEW** project that guides others through setting up and running both the frontend (Electron) and backend (Python Flask/FastAPI/etc.):
 
----
+
+
 
 ```markdown
 # OMNIVIEW
@@ -57,7 +57,7 @@ cd backend
 #if want a virtual environment
     python -m venv venv         # Create virtual environment
     source venv/bin/activate    # On Windows: venv\Scripts\activate
-    
+
 # Intall all Python dependencies
 pip install -r requirements.txt
 
