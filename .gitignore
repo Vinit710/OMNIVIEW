@@ -1,6 +1,0 @@
-node_modules
-/node_modules
-/dist
-/omniview-win32-x64
-*.log
-.DS_Store
