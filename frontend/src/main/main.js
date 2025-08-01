@@ -11,14 +11,10 @@ function createWindow() {
       contextIsolation: false,
     },
   });
-  win.loadFile(path.join(__dirname, "index.html"));
+  win.loadFile(path.join(__dirname, "../renderer/index.html"));
 }
 
 app.whenReady().then(() => {
-  // exec("python ../backend/app.py", (err, stdout, stderr) => {
-  //   if (err) console.error(err);
-  //   else console.log("Python backend started.");
-  // });
   createWindow();
 });
 
