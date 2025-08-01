@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OmniView</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
+    />
+    <link rel="stylesheet" href="css/main.css" />
+  </head>
+  <body>
+    <!-- Main Container -->
+    <div class="main-container">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-title">MONITORING</div>
+        </div>
+
+        <div class="monitoring-section">
+          <div class="monitoring-item active">
+            <div class="item-icon">🏢</div>
+            <span>Buildings</span>
+          </div>
+          <div class="monitoring-item">
+            <div class="item-icon">🛣️</div>
+            <span>Roads</span>
+          </div>
+          <div class="monitoring-item">
+            <div class="item-icon">💧</div>
+            <span>Water Bodies</span>
+          </div>
+          <div class="monitoring-item">
+            <div class="item-icon">🚢</div>
+            <span>Ships</span>
+          </div>
+          <div class="monitoring-item">
+            <div class="item-icon">✈️</div>
+            <span>Aircraft's</span>
+          </div>
+        </div>
+
+        <button class="analyze-btn">Analyze</button>
+      </div>
+
+      <!-- Map Container -->
+      <div class="map-container">
+        <!-- Search -->
+        <div class="search-container">
+          <input type="text" class="search-input" placeholder="Search" />
+          <div class="search-icon">🔍</div>
+        </div>
+
+        <!-- Map Tools -->
+        <div class="map-tools">
+          <button class="tool-btn">✏️</button>
+          <button class="tool-btn">⬜</button>
+          <button class="tool-btn">✋</button>
+          <button class="tool-btn">📏</button>
+        </div>
+
+        <!-- Map -->
+        <div id="map"></div>
+
+        <!-- Coordinates -->
+        <div class="coordinates" id="coordinates">18.5246° N, 73.8796° E</div>
+
+        <!-- Bottom Panel -->
+        <div class="bottom-panel">
+          <div class="panel-header">
+            <div class="panel-title">Logs</div>
+            <button class="expand-btn">Expand ▼</button>
+          </div>
+          <div class="logs-content">
+            <div class="log-warning">
+              Warning: A pedo name Vinit been detected
+            </div>
+            <div class="log-warning">
+              Warning: Can't process the data of his basement
+            </div>
+            <div class="log-error">Error: Van went missing</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script>
+      // Initialize the map
+      const map = L.map("map").setView([20.5937, 78.9629], 5);
+
+      // Add OpenStreetMap tiles
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+      }).addTo(map);
+
+      // Add some markers for major cities
+      const cities = [
+        // { name: "Mumbai", coords: [19.076, 72.8777] },
+        // { name: "Delhi", coords: [28.6139, 77.209] },
+        // { name: "Bangalore", coords: [12.9716, 77.5946] },
+        // { name: "Chennai", coords: [13.0827, 80.2707] },
+        // { name: "Hyderabad", coords: [17.385, 78.4867] },
+        { name: "Pune", coords: [18.5204, 73.8567] },
+        // { name: "Kolkata", coords: [22.5726, 88.3639] },
+      ];
+
+      cities.forEach((city) => {
+        L.marker(city.coords).addTo(map).bindPopup(city.name);
+      });
+
+      // Update coordinates on mouse move
+      map.on("mousemove", function (e) {
+        document.getElementById(
+          "coordinates"
+        ).textContent = `${e.latlng.lat.toFixed(4)}° N, ${e.latlng.lng.toFixed(
+          4
+        )}° E`;
+      });
+
+      // Sidebar interactions
+      document.querySelectorAll(".monitoring-item").forEach((item) => {
+        item.addEventListener("click", function () {
+          document
+            .querySelectorAll(".monitoring-item")
+            .forEach((i) => i.classList.remove("active"));
+          this.classList.add("active");
+        });
+      });
+
+      // Search functionality
+      document
+        .querySelector(".search-input")
+        .addEventListener("keypress", function (e) {
+          if (e.key === "Enter") {
+            const query = this.value;
+            // In real app, implement geocoding search
+            console.log("Search for:", query);
+          }
+        });
+
+      // Analyze button
+      document.querySelector(".analyze-btn").addEventListener("click", () => {
+        console.log("Starting analysis...");
+        // Add analysis functionality
+      });
+
+      // Expand logs
+      document
+        .querySelector(".expand-btn")
+        .addEventListener("click", function () {
+          const panel = document.querySelector(".bottom-panel");
+          if (panel.style.height === "300px") {
+            panel.style.height = "120px";
+            this.textContent = "Expand ▼";
+          } else {
+            panel.style.height = "300px";
+            this.textContent = "Collapse ▲";
+          }
+        });
+    </script>
+  </body>
+</html>
