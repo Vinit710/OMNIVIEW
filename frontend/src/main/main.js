@@ -134,7 +134,9 @@ const template = [
       {
         label: "Documentation",
         click: () => {
-          require("electron").shell.openExternal("https://your-docs-url.com");
+          require("electron").shell.openExternal(
+            "https://github.com/Vinit710/OMNIVIEW"
+          );
         },
       },
     ],
@@ -152,6 +154,7 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
     },
+    icon: path.join(__dirname, "../assets/icon.png"),
   });
   win.loadFile(path.join(__dirname, "../renderer/index.html"));
 }
