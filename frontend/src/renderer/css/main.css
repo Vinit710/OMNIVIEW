@@ -232,7 +232,7 @@ body {
 /* Coordinates Display */
 .coordinates {
   position: absolute;
-  bottom: 60px;
+  bottom: 124px;
   right: 20px;
   z-index: 1000;
   background: rgba(0, 0, 0, 0.7);

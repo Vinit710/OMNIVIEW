@@ -71,16 +71,18 @@
         <div class="bottom-panel">
           <div class="panel-header">
             <div class="panel-title">Logs</div>
-            <button class="expand-btn">Expand ▼</button>
+            <button class="expand-btn">Expand ▲</button>
           </div>
           <div class="logs-content">
             <div class="log-warning">
-              Warning: A pedo name Vinit been detected
+              Warning: No area sleected for analysis
             </div>
             <div class="log-warning">
-              Warning: Can't process the data of his basement
+              <!-- Warning: Can't fetch data for selected area -->
             </div>
-            <div class="log-error">Error: Van went missing</div>
+            <div class="log-error">
+              Error: Can't fetch data for selected area
+            </div>
           </div>
         </div>
       </div>
@@ -89,11 +91,28 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
       // Initialize the map
-      const map = L.map("map").setView([20.5937, 78.9629], 5);
+      const map = L.map("map", {
+        center: [20.5937, 78.9629],
+        zoom: 5,
+        minZoom: 3,
+        maxZoom: 18,
+        maxBounds: [
+          [-90, -180], // Southwest coordinates
+          [90, 180], // Northeast coordinates
+        ],
+        maxBoundsViscosity: 1.0, // How much to resist dragging outside bounds (0-1)
+        worldCopyJump: false, // Disable world copy jumping
+        zoomControl: true,
+      });
 
       // Add OpenStreetMap tiles
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap contributors",
+        noWrap: true, // Prevent horizontal repeating
+        bounds: [
+          [-90, -180],
+          [90, 180],
+        ], // Tile bounds
       }).addTo(map);
 
       // Add some markers for major cities
@@ -154,10 +173,10 @@
           const panel = document.querySelector(".bottom-panel");
           if (panel.style.height === "300px") {
             panel.style.height = "120px";
-            this.textContent = "Expand ▼";
+            this.textContent = "Expand ▲";
           } else {
             panel.style.height = "300px";
-            this.textContent = "Collapse ▲";
+            this.textContent = "Collapse ▼";
           }
         });
     </script>
