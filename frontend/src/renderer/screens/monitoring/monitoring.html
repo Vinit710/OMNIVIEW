@@ -16,7 +16,26 @@
       <!-- Sidebar -->
       <div class="sidebar">
         <div class="sidebar-header">
-          <div class="sidebar-title">MONITORING</div>
+          <div class="sidebar-title-container">
+            <div class="sidebar-title active-screen" id="sidebarTitle">
+              MONITORING
+            </div>
+            <div class="dropdown-arrow">▼</div>
+          </div>
+          <div class="screen-dropdown" id="screenDropdown">
+            <div class="dropdown-item active" data-screen="monitoring">
+              <div class="dropdown-icon">📊</div>
+              <span>MONITORING</span>
+            </div>
+            <div class="dropdown-item" data-screen="disaster">
+              <div class="dropdown-icon">⚠️</div>
+              <span>DISASTER</span>
+            </div>
+            <div class="dropdown-item" data-screen="analytics">
+              <div class="dropdown-icon">📈</div>
+              <span>ANALYTICS</span>
+            </div>
+          </div>
         </div>
 
         <div class="monitoring-section">
@@ -59,8 +78,6 @@
           <button class="tool-btn">⬜</button>
           <button class="tool-btn">✋</button>
           <button class="tool-btn">📏</button>
-          <!-- Add this button to your sidebar or map-tools -->
-          <button class="tool-btn" id="newsBtn">📰 News</button>
         </div>
 
         <!-- Map -->
@@ -76,9 +93,7 @@
             <button class="expand-btn">Expand ▲</button>
           </div>
           <div class="logs-content">
-            <div class="log-warning">
-              Warning: No area sleected for analysis
-            </div>
+            <div class="log-warning">Warning: No area slected for analysis</div>
             <div class="log-warning">
               <!-- Warning: Can't fetch data for selected area -->
             </div>
@@ -87,31 +102,10 @@
             </div>
           </div>
         </div>
-
-        <!-- Add this panel inside .map-container, after #map -->
-        <div
-          id="newsPanel"
-          style="display:none; position:absolute; top:60px; left:0; right:0; bottom:0; background:#fff; z-index:1000; padding:32px; overflow:auto;"
-        >
-          <h2>News Search</h2>
-          <input
-            type="text"
-            id="newsQuery"
-            placeholder="Type your news query..."
-            style="width:60%;padding:8px;"
-          />
-          <button id="newsSearchBtn">Search</button>
-          <div id="newsResults" style="margin-top:24px;"></div>
-          <button
-            id="closeNewsPanel"
-            style="position:absolute;top:16px;right:16px;"
-          >
-            Close ✖
-          </button>
-        </div>
       </div>
     </div>
-
+    <!-- Closing tag for main-container -->
+    <script src="monitoring.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
       // Initialize the map
@@ -203,169 +197,131 @@
             this.textContent = "Collapse ▼";
           }
         });
-        let areaSelectMode = false;
-let areaRectangle = null;
-let selectedBounds = null;
+      let areaSelectMode = false;
+      let areaRectangle = null;
+      let selectedBounds = null;
 
-// Helper: Calculate bounds for 1km x 1km square centered at latlng
-function getSquareBounds(center, sizeMeters = 1000) {
-  const halfSizeLat = (sizeMeters / 2) / 111000;
-  const halfSizeLng = (sizeMeters / 2) / (111000 * Math.cos(center.lat * Math.PI / 180));
-  return [
-    [center.lat - halfSizeLat, center.lng - halfSizeLng],
-    [center.lat + halfSizeLat, center.lng + halfSizeLng]
-  ];
-}
+      // Helper: Calculate bounds for 1km x 1km square centered at latlng
+      function getSquareBounds(center, sizeMeters = 1000) {
+        const halfSizeLat = sizeMeters / 2 / 111000;
+        const halfSizeLng =
+          sizeMeters / 2 / (111000 * Math.cos((center.lat * Math.PI) / 180));
+        return [
+          [center.lat - halfSizeLat, center.lng - halfSizeLng],
+          [center.lat + halfSizeLat, center.lng + halfSizeLng],
+        ];
+      }
 
-// Square tool button click
-document.querySelectorAll(".tool-btn")[1].addEventListener("click", () => {
-  areaSelectMode = true;
-  map.getContainer().style.cursor = "crosshair";
-  alert("Click on the map to select the center of a 1km x 1km area.");
-});
+      // Square tool button click
+      document
+        .querySelectorAll(".tool-btn")[1]
+        .addEventListener("click", () => {
+          areaSelectMode = true;
+          map.getContainer().style.cursor = "crosshair";
+          alert("Click on the map to select the center of a 1km x 1km area.");
+        });
 
-// Map click for area selection
-map.on("click", function (e) {
-  if (!areaSelectMode) return;
+      // Map click for area selection
+      map.on("click", function (e) {
+        if (!areaSelectMode) return;
 
-  // Remove previous rectangle
-  if (areaRectangle) {
-    map.removeLayer(areaRectangle);
-    areaRectangle = null;
-  }
+        // Remove previous rectangle
+        if (areaRectangle) {
+          map.removeLayer(areaRectangle);
+          areaRectangle = null;
+        }
 
-  // Draw new rectangle
-  const bounds = getSquareBounds(e.latlng, 1000);
-  selectedBounds = bounds;
-  areaRectangle = L.rectangle(bounds, { color: "#00a8e8", weight: 2 }).addTo(map);
+        // Draw new rectangle
+        const bounds = getSquareBounds(e.latlng, 1000);
+        selectedBounds = bounds;
+        areaRectangle = L.rectangle(bounds, {
+          color: "#00a8e8",
+          weight: 2,
+        }).addTo(map);
 
-  // Show popup for confirm/cancel
-  areaRectangle.bindPopup(`
+        // Show popup for confirm/cancel
+        areaRectangle
+          .bindPopup(
+            `
     <b>Area Selected</b><br>
     Size: 1km x 1km<br>
     <button id="confirmAreaBtn">Confirm</button>
     <button id="cancelAreaBtn">Cancel</button>
-  `).openPopup();
+  `
+          )
+          .openPopup();
 
-  setTimeout(() => {
-    document.getElementById("confirmAreaBtn").onclick = () => {
-      areaRectangle.closePopup();
-      areaSelectMode = false;
-      map.getContainer().style.cursor = "";
+        setTimeout(() => {
+          document.getElementById("confirmAreaBtn").onclick = () => {
+            areaRectangle.closePopup();
+            areaSelectMode = false;
+            map.getContainer().style.cursor = "";
 
-      // Send coordinates to backend
-      fetch("http://localhost:5000/api/area", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bounds: selectedBounds })
-      })
-      .then(res => res.json())
-      .then(data => {
-        // Show popup with action buttons
-        areaRectangle.bindPopup(`
+            // Send coordinates to backend
+            fetch("http://localhost:5000/api/area", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ bounds: selectedBounds }),
+            })
+              .then((res) => res.json())
+              .then((data) => {
+                // Show popup with action buttons
+                areaRectangle
+                  .bindPopup(
+                    `
           <b>Area Ready</b><br>
           <button id="getSatelliteBtn">Get Satellite Image</button>
           <button id="extractRoadsBtn">Extract Roads</button>
-        `).openPopup();
+        `
+                  )
+                  .openPopup();
 
-        setTimeout(() => {
-          document.getElementById("getSatelliteBtn").onclick = () => {
-            fetch("http://localhost:5000/api/satellite-image", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ bounds: selectedBounds })
-            })
-            .then(res => res.json())
-            .then(imgData => {
-              areaRectangle.bindPopup(
-                `<b>Satellite Image</b><br><img src="${imgData.url}" style="width:100%;max-width:300px;">`
-              ).openPopup();
-            });
+                setTimeout(() => {
+                  document.getElementById("getSatelliteBtn").onclick = () => {
+                    fetch("http://localhost:5000/api/satellite-image", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ bounds: selectedBounds }),
+                    })
+                      .then((res) => res.json())
+                      .then((imgData) => {
+                        areaRectangle
+                          .bindPopup(
+                            `<b>Satellite Image</b><br><img src="${imgData.url}" style="width:100%;max-width:300px;">`
+                          )
+                          .openPopup();
+                      });
+                  };
+
+                  document.getElementById("extractRoadsBtn").onclick = () => {
+                    fetch("http://localhost:5000/api/extract-roads", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ bounds: selectedBounds }),
+                    })
+                      .then((res) => res.json())
+                      .then((roadsData) => {
+                        areaRectangle
+                          .bindPopup(
+                            `<b>Roads Extracted</b><br>${
+                              roadsData.summary || "Roads data received."
+                            }`
+                          )
+                          .openPopup();
+                      });
+                  };
+                }, 100);
+              });
           };
 
-          document.getElementById("extractRoadsBtn").onclick = () => {
-            fetch("http://localhost:5000/api/extract-roads", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ bounds: selectedBounds })
-            })
-            .then(res => res.json())
-            .then(roadsData => {
-              areaRectangle.bindPopup(
-                `<b>Roads Extracted</b><br>${roadsData.summary || "Roads data received."}`
-              ).openPopup();
-            });
+          document.getElementById("cancelAreaBtn").onclick = () => {
+            map.removeLayer(areaRectangle);
+            areaRectangle = null;
+            areaSelectMode = false;
+            map.getContainer().style.cursor = "";
           };
         }, 100);
       });
-    };
-
-    document.getElementById("cancelAreaBtn").onclick = () => {
-      map.removeLayer(areaRectangle);
-      areaRectangle = null;
-      areaSelectMode = false;
-      map.getContainer().style.cursor = "";
-    };
-  }, 100);
-});
-
-// News panel functionality
-const newsPanel = document.getElementById("newsPanel");
-const newsBtn = document.getElementById("newsBtn");
-const closeNewsPanel = document.getElementById("closeNewsPanel");
-const newsSearchBtn = document.getElementById("newsSearchBtn");
-const newsQuery = document.getElementById("newsQuery");
-const newsResults = document.getElementById("newsResults");
-
-newsBtn.addEventListener("click", () => {
-  newsPanel.style.display = "block";
-  map.getContainer().style.pointerEvents = "none";
-});
-
-closeNewsPanel.addEventListener("click", () => {
-  newsPanel.style.display = "none";
-  map.getContainer().style.pointerEvents = "auto";
-});
-
-newsSearchBtn.addEventListener("click", () => {
-  const query = newsQuery.value;
-  if (!query) return;
-
-  // Clear previous results
-  newsResults.innerHTML = "Loading...";
-  newsResults.style.display = "block";
-
-  // Fetch news data from the server
-  fetch("http://localhost:5000/api/news", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query })
-  })
-  .then(res => res.json())
-  .then(data => {
-    newsResults.innerHTML = ""; // Clear loading text
-
-    if (data.articles && data.articles.length > 0) {
-      data.articles.forEach(article => {
-        const div = document.createElement("div");
-        div.className = "news-article";
-        div.innerHTML = `
-          <h3>${article.title}</h3>
-          <p>${article.description || ""}</p>
-          <a href="${article.url}" target="_blank">Read more</a>
-          <hr>
-        `;
-        newsResults.appendChild(div);
-      });
-    } else {
-      newsResults.innerHTML = "No news articles found.";
-    }
-  })
-  .catch(err => {
-    newsResults.innerHTML = "Error fetching news.";
-    console.error(err);
-  });
-});
     </script>
   </body>
 </html>

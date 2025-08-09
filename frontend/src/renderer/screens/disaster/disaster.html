@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OmniView</title>
+    <link rel="stylesheet" href="disaster.css" />
+  </head>
+  <body>
+    <!-- Main Container -->
+    <div class="main-container">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-title-container">
+            <div class="sidebar-title active-screen" id="sidebarTitle">
+              DISASTER
+            </div>
+            <div class="dropdown-arrow">▼</div>
+          </div>
+          <div class="screen-dropdown" id="screenDropdown">
+            <div class="dropdown-item" data-screen="monitoring">
+              <div class="dropdown-icon">📊</div>
+              <span>MONITORING</span>
+            </div>
+            <div class="dropdown-item active" data-screen="disaster">
+              <div class="dropdown-icon">⚠️</div>
+              <span>DISASTER</span>
+            </div>
+            <div class="dropdown-item" data-screen="analytics">
+              <div class="dropdown-icon">📈</div>
+              <span>ANALYTICS</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="menu-section">
+          <div class="menu-item active" data-section="news">
+            <div class="item-icon">📰</div>
+            <span>News</span>
+          </div>
+          <div class="menu-item" data-section="post-disaster">
+            <div class="item-icon">🚨</div>
+            <span>Post Disaster</span>
+          </div>
+          <div class="menu-item" data-section="pre-disaster">
+            <div class="item-icon">⚠️</div>
+            <span>Pre Disaster</span>
+          </div>
+        </div>
+
+        <button class="refresh-btn" id="refreshBtn">Refresh</button>
+      </div>
+
+      <!-- Content Container -->
+      <div class="content-container">
+        <!-- Search Container -->
+        <div class="search-container">
+          <div class="search-box">
+            <input
+              type="text"
+              class="search-input"
+              id="searchInput"
+              placeholder="Search for news, disasters, or alerts..."
+            />
+            <button class="search-btn" id="searchBtn">Search</button>
+          </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="content-area">
+          <!-- Default Content -->
+          <div class="default-content" id="defaultContent">
+            <h2>Welcome to News Dashboard</h2>
+            <p>
+              Stay updated with the latest news, disaster reports, and emergency
+              alerts. Select a category from the sidebar or use the search
+              function to find specific information.
+            </p>
+
+            <div class="content-cards">
+              <div class="content-card">
+                <div class="card-icon">📰</div>
+                <h3>Latest News</h3>
+                <p>
+                  Access breaking news and current events from reliable sources
+                  worldwide.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- News Results -->
+          <div class="news-results" id="newsResults">
+            <div class="section-title" id="sectionTitle">Latest News</div>
+            <div id="resultsContainer"></div>
+          </div>
+        </div>
+
+        <!-- Bottom Panel -->
+        <div class="bottom-panel">
+          <div class="panel-header">
+            <div class="panel-title">Logs</div>
+            <button class="expand-btn">Expand ▲</button>
+          </div>
+          <div class="logs-content">
+            <div class="log-warning">Warning: No news articles found</div>
+            <div class="log-warning">
+              Warning: Unable to fetch latest updates
+            </div>
+            <div class="log-error">
+              Error: Connection to news service failed
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="disaster.js"></script>
+  </body>
+</html>
