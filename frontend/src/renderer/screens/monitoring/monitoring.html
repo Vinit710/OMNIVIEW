@@ -9,6 +9,7 @@
       href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
     />
     <link rel="stylesheet" href="monitoring.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   </head>
   <body>
     <!-- Main Container -->
@@ -206,109 +207,103 @@
         ];
       }
 
-      document
-        .querySelectorAll(".tool-btn")[1]
-        .addEventListener("click", () => {
-          areaSelectMode = true;
-          map.getContainer().style.cursor = "crosshair";
-          alert("Click on the map to select the center of a 1km x 1km area.");
-        });
+      
 
-      map.on("click", function (e) {
-        if (!areaSelectMode) return;
+        
+      document.querySelectorAll(".monitoring-item")[1].addEventListener("click", () => {
+  // Enable area selection for roads tab
+  areaSelectMode = true;
+  map.getContainer().style.cursor = "crosshair";
+  alert("Click on the map to select the center of a 1km x 1km area for road extraction.");
+});
 
-        if (areaRectangle) {
-          map.removeLayer(areaRectangle);
-          areaRectangle = null;
-        }
+map.on("click", function (e) {
+  if (!areaSelectMode) return;
 
-        const bounds = getSquareBounds(e.latlng, 1000);
-        selectedBounds = bounds;
-        areaRectangle = L.rectangle(bounds, {
-          color: "#00a8e8",
-          weight: 2,
-        }).addTo(map);
+  if (areaRectangle) {
+    map.removeLayer(areaRectangle);
+    areaRectangle = null;
+  }
 
-        areaRectangle
-          .bindPopup(
-            `
+  const bounds = getSquareBounds(e.latlng, 1000);
+  selectedBounds = bounds;
+  areaRectangle = L.rectangle(bounds, { color: "#00a8e8", weight: 2 }).addTo(map);
+
+  areaRectangle.bindPopup(`
     <b>Area Selected</b><br>
     Size: 1km x 1km<br>
-    <button id="confirmAreaBtn">Confirm</button>
+    <button id="extractRoadsBtn">Extract Roads</button>
     <button id="cancelAreaBtn">Cancel</button>
-  `
-          )
-          .openPopup();
+  `).openPopup();
 
-        setTimeout(() => {
-          document.getElementById("confirmAreaBtn").onclick = () => {
-            areaRectangle.closePopup();
-            areaSelectMode = false;
-            map.getContainer().style.cursor = "";
+  setTimeout(() => {
+    // Extract Roads button handler
+    const extractBtn = document.getElementById("extractRoadsBtn");
+    if (extractBtn) {
+      extractBtn.onclick = async () => {
+        console.log("Extract Roads button clicked");
+        areaSelectMode = false;
+        map.getContainer().style.cursor = "";
+        map.fitBounds(selectedBounds);
 
-            fetch("http://localhost:5000/api/area", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ bounds: selectedBounds }),
-            })
-              .then((res) => res.json())
-              .then((data) => {
-                areaRectangle
-                  .bindPopup(
-                    `
-          <b>Area Ready</b><br>
-          <button id="getSatelliteBtn">Get Satellite Image</button>
-          <button id="extractRoadsBtn">Extract Roads</button>
-        `
-                  )
-                  .openPopup();
+        setTimeout(async () => {
+          const mapDiv = document.getElementById("map");
+          const canvas = await html2canvas(mapDiv, {
+            useCORS: true,
+            backgroundColor: null
+          });
+          const imageBase64 = canvas.toDataURL("image/png");
+          console.log("Screenshot taken, sending to backend...");
 
-                setTimeout(() => {
-                  document.getElementById("getSatelliteBtn").onclick = () => {
-                    fetch("http://localhost:5000/api/satellite-image", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ bounds: selectedBounds }),
-                    })
-                      .then((res) => res.json())
-                      .then((imgData) => {
-                        areaRectangle
-                          .bindPopup(
-                            `<b>Satellite Image</b><br><img src="${imgData.url}" style="width:100%;max-width:300px;">`
-                          )
-                          .openPopup();
-                      });
-                  };
+          fetch("http://localhost:5000/api/road-detection", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ image_base64: imageBase64 })
+})
+  .then(async (res) => {
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.error("Backend returned error:", res.status, body);
+      areaRectangle.bindPopup(`<b>Error</b><br>${body.error || 'Server error'}`).openPopup();
+      return;
+    }
+    // success
+    console.log("Backend data:", body);
+    const probMask = body.probability_mask;
+    //const binUrl = body.binary_mask_url;
 
-                  document.getElementById("extractRoadsBtn").onclick = () => {
-                    fetch("http://localhost:5000/api/extract-roads", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ bounds: selectedBounds }),
-                    })
-                      .then((res) => res.json())
-                      .then((roadsData) => {
-                        areaRectangle
-                          .bindPopup(
-                            `<b>Roads Extracted</b><br>${
-                              roadsData.summary || "Roads data received."
-                            }`
-                          )
-                          .openPopup();
-                      });
-                  };
-                }, 100);
-              });
-          };
+    if (!probMask) {
+      console.error("Missing URLs in response:", body);
+      areaRectangle.bindPopup("<b>Error</b><br>Invalid response from backend.").openPopup();
+      return;
+    }
 
-          document.getElementById("cancelAreaBtn").onclick = () => {
-            map.removeLayer(areaRectangle);
-            areaRectangle = null;
-            areaSelectMode = false;
-            map.getContainer().style.cursor = "";
-          };
-        }, 100);
-      });
+    areaRectangle.bindPopup(`
+      <b>Road Detection Result</b><br>
+      <div><strong>Probability mask</strong><br><img src="${probMask}" style="width:100%;max-width:300px;"></div>
+      
+    `).openPopup();
+  })
+  .catch((err) => {
+    console.error("Network or other error:", err);
+    areaRectangle.bindPopup("Error extracting roads (network/server).").openPopup();
+            });
+        }, 1000);
+      };
+    }
+
+    // Cancel button handler
+    const cancelBtn = document.getElementById("cancelAreaBtn");
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        map.removeLayer(areaRectangle);
+        areaRectangle = null;
+        areaSelectMode = false;
+        map.getContainer().style.cursor = "";
+      };
+    }
+  }, 150);
+});
 
       // Layer Switch Button Handlers
       document.getElementById("defaultLayerBtn").onclick = function () {
