@@ -65,12 +65,7 @@
       </div>
 
       <!-- Map Container -->
-      <div class="map-container">
-        <!-- Search -->
-        <div class="search-container">
-          <input type="text" class="search-input" placeholder="Search" />
-          <div class="search-icon">🔍</div>
-        </div>
+      
 
         <!-- Map Tools -->
         <div class="map-tools">
@@ -78,6 +73,19 @@
           <button class="tool-btn">⬜</button>
           <button class="tool-btn">✋</button>
           <button class="tool-btn">📏</button>
+        </div>
+
+        <div class="map-container">
+        <!-- Search -->
+        <div class="search-container">
+          <input type="text" class="search-input" placeholder="Search" />
+          <div class="search-icon">🔍</div>
+        </div>
+
+        <!-- Layer Switch Buttons (move this below map-tools) -->
+        <div class="map-layer-controls">
+          <button id="defaultLayerBtn" class="layer-btn active">Default</button>
+          <button id="satelliteLayerBtn" class="layer-btn">Satellite</button>
         </div>
 
         <!-- Map -->
@@ -108,42 +116,84 @@
     <script src="monitoring.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
-      // Initialize the map
+      // === Base Layers ===
+      const defaultLayer = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        { attribution: "© OpenStreetMap contributors", noWrap: true }
+      );
+
+      const satelliteLayer = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        { attribution: "Tiles © Esri" }
+      );
+
+      // === Map Initialization ===
       const map = L.map("map", {
         center: [20.5937, 78.9629],
         zoom: 5,
+        layers: [defaultLayer], // Default layer on load
         minZoom: 3,
         maxZoom: 18,
         maxBounds: [
-          [-90, -180], // Southwest coordinates
-          [90, 180], // Northeast coordinates
-        ],
-        maxBoundsViscosity: 1.0, // How much to resist dragging outside bounds (0-1)
-        worldCopyJump: false, // Disable world copy jumping
-        zoomControl: true,
-      });
-
-      // Add OpenStreetMap tiles
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
-        noWrap: true, // Prevent horizontal repeating
-        bounds: [
           [-90, -180],
           [90, 180],
-        ], // Tile bounds
-      }).addTo(map);
+        ],
+        maxBoundsViscosity: 1.0,
+      });
 
-      // Add some markers for major cities
+      // === Layer Switch Buttons ===
+      const layerControl = L.control({ position: "bottomleft" });
+
+      layerControl.onAdd = function () {
+        const container = L.DomUtil.create("div", "layer-switch-container");
+
+        const btnDefault = L.DomUtil.create("button", "layer-btn", container);
+        btnDefault.innerHTML = "🗺 Default";
+        btnDefault.onclick = () => {
+          map.removeLayer(satelliteLayer);
+          map.addLayer(defaultLayer);
+        };
+
+        const btnSatellite = L.DomUtil.create("button", "layer-btn", container);
+        btnSatellite.innerHTML = "🛰 Satellite";
+        btnSatellite.onclick = () => {
+          map.removeLayer(defaultLayer);
+          map.addLayer(satelliteLayer);
+        };
+
+        return container;
+      };
+
+      layerControl.addTo(map);
+
+      // === Styling for buttons ===
+      const style = document.createElement("style");
+      style.innerHTML = `
+        .layer-switch-container {
+          display: flex;
+          flex-direction: column;
+          background: rgba(255, 255, 255, 0.9);
+          border-radius: 4px;
+          overflow: hidden;
+          box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+        }
+        .layer-btn {
+          border: none;
+          background: none;
+          padding: 5px 10px;
+          cursor: pointer;
+          font-size: 14px;
+        }
+        .layer-btn:hover {
+          background: #ddd;
+        }
+      `;
+      document.head.appendChild(style);
+
+      // === Markers ===
       const cities = [
-        // { name: "Mumbai", coords: [19.076, 72.8777] },
-        // { name: "Delhi", coords: [28.6139, 77.209] },
-        // { name: "Bangalore", coords: [12.9716, 77.5946] },
-        // { name: "Chennai", coords: [13.0827, 80.2707] },
-        // { name: "Hyderabad", coords: [17.385, 78.4867] },
         { name: "Pune", coords: [18.5204, 73.8567] },
-        // { name: "Kolkata", coords: [22.5726, 88.3639] },
       ];
-
       cities.forEach((city) => {
         L.marker(city.coords).addTo(map).bindPopup(city.name);
       });
@@ -170,7 +220,6 @@
         .addEventListener("keypress", function (e) {
           if (e.key === "Enter") {
             const query = this.value;
-            // In real app, implement geocoding search
             console.log("Search for:", query);
           }
         });
@@ -178,7 +227,6 @@
       // Analyze button
       document.querySelector(".analyze-btn").addEventListener("click", () => {
         console.log("Starting analysis...");
-        // Add analysis functionality
       });
 
       // Expand logs
@@ -194,11 +242,11 @@
             this.textContent = "Collapse ▼";
           }
         });
+
       let areaSelectMode = false;
       let areaRectangle = null;
       let selectedBounds = null;
 
-      // Helper: Calculate bounds for 1km x 1km square centered at latlng
       function getSquareBounds(center, sizeMeters = 1000) {
         const halfSizeLat = sizeMeters / 2 / 111000;
         const halfSizeLng =
@@ -209,7 +257,6 @@
         ];
       }
 
-      // Square tool button click
       document
         .querySelectorAll(".tool-btn")[1]
         .addEventListener("click", () => {
@@ -218,17 +265,14 @@
           alert("Click on the map to select the center of a 1km x 1km area.");
         });
 
-      // Map click for area selection
       map.on("click", function (e) {
         if (!areaSelectMode) return;
 
-        // Remove previous rectangle
         if (areaRectangle) {
           map.removeLayer(areaRectangle);
           areaRectangle = null;
         }
 
-        // Draw new rectangle
         const bounds = getSquareBounds(e.latlng, 1000);
         selectedBounds = bounds;
         areaRectangle = L.rectangle(bounds, {
@@ -236,7 +280,6 @@
           weight: 2,
         }).addTo(map);
 
-        // Show popup for confirm/cancel
         areaRectangle
           .bindPopup(
             `
@@ -254,7 +297,6 @@
             areaSelectMode = false;
             map.getContainer().style.cursor = "";
 
-            // Send coordinates to backend
             fetch("http://localhost:5000/api/area", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -262,7 +304,6 @@
             })
               .then((res) => res.json())
               .then((data) => {
-                // Show popup with action buttons
                 areaRectangle
                   .bindPopup(
                     `
@@ -319,6 +360,28 @@
           };
         }, 100);
       });
+
+      document.getElementById("defaultLayerBtn").onclick = function () {
+        if (!map.hasLayer(defaultLayer)) {
+          map.addLayer(defaultLayer);
+        }
+        if (map.hasLayer(satelliteLayer)) {
+          map.removeLayer(satelliteLayer);
+        }
+        this.classList.add("active");
+        document.getElementById("satelliteLayerBtn").classList.remove("active");
+      };
+
+      document.getElementById("satelliteLayerBtn").onclick = function () {
+        if (!map.hasLayer(satelliteLayer)) {
+          map.addLayer(satelliteLayer);
+        }
+        if (map.hasLayer(defaultLayer)) {
+          map.removeLayer(defaultLayer);
+        }
+        this.classList.add("active");
+        document.getElementById("defaultLayerBtn").classList.remove("active");
+      };
     </script>
   </body>
 </html>

@@ -451,3 +451,36 @@ body {
 .news-article a {
   color: #00bfff;
 }
+/* Map Layer Switch Buttons - Bottom Left */
+
+.map-layer-controls {
+  position: absolute;
+  top: 20px; /* adjust as needed to appear below map-tools */
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  gap: 8px;
+  margin-top: 0;
+  justify-content: flex-start;
+}
+
+.layer-btn {
+  background: rgb(173, 33, 33);
+  color: #333;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: background 0.2s, color 0.2s;
+}
+
+.layer-btn:hover {
+  background: #f5f5f5;
+}
+
+.layer-btn.active {
+  background: #00a8e8;
+  color: white;
+}
