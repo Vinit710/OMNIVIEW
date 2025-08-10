@@ -65,8 +65,7 @@
       </div>
 
       <!-- Map Container -->
-      
-
+      <div class="map-container">
         <!-- Map Tools -->
         <div class="map-tools">
           <button class="tool-btn">✏️</button>
@@ -75,14 +74,13 @@
           <button class="tool-btn">📏</button>
         </div>
 
-        <div class="map-container">
         <!-- Search -->
         <div class="search-container">
           <input type="text" class="search-input" placeholder="Search" />
           <div class="search-icon">🔍</div>
         </div>
 
-        <!-- Layer Switch Buttons (move this below map-tools) -->
+        <!-- Layer Switch Buttons -->
         <div class="map-layer-controls">
           <button id="defaultLayerBtn" class="layer-btn active">Default</button>
           <button id="satelliteLayerBtn" class="layer-btn">Satellite</button>
@@ -140,55 +138,6 @@
         ],
         maxBoundsViscosity: 1.0,
       });
-
-      // === Layer Switch Buttons ===
-      const layerControl = L.control({ position: "bottomleft" });
-
-      layerControl.onAdd = function () {
-        const container = L.DomUtil.create("div", "layer-switch-container");
-
-        const btnDefault = L.DomUtil.create("button", "layer-btn", container);
-        btnDefault.innerHTML = "🗺 Default";
-        btnDefault.onclick = () => {
-          map.removeLayer(satelliteLayer);
-          map.addLayer(defaultLayer);
-        };
-
-        const btnSatellite = L.DomUtil.create("button", "layer-btn", container);
-        btnSatellite.innerHTML = "🛰 Satellite";
-        btnSatellite.onclick = () => {
-          map.removeLayer(defaultLayer);
-          map.addLayer(satelliteLayer);
-        };
-
-        return container;
-      };
-
-      layerControl.addTo(map);
-
-      // === Styling for buttons ===
-      const style = document.createElement("style");
-      style.innerHTML = `
-        .layer-switch-container {
-          display: flex;
-          flex-direction: column;
-          background: rgba(255, 255, 255, 0.9);
-          border-radius: 4px;
-          overflow: hidden;
-          box-shadow: 0 1px 5px rgba(0,0,0,0.4);
-        }
-        .layer-btn {
-          border: none;
-          background: none;
-          padding: 5px 10px;
-          cursor: pointer;
-          font-size: 14px;
-        }
-        .layer-btn:hover {
-          background: #ddd;
-        }
-      `;
-      document.head.appendChild(style);
 
       // === Markers ===
       const cities = [
@@ -361,6 +310,7 @@
         }, 100);
       });
 
+      // Layer Switch Button Handlers
       document.getElementById("defaultLayerBtn").onclick = function () {
         if (!map.hasLayer(defaultLayer)) {
           map.addLayer(defaultLayer);

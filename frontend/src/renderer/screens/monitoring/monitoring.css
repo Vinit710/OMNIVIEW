@@ -465,7 +465,7 @@ body {
 }
 
 .layer-btn {
-  background: rgb(173, 33, 33);
+  background: rgba(55, 79, 219, 0.938);
   color: #333;
   border: none;
   border-radius: 6px;
