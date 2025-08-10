@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -8,7 +8,7 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
     />
-    <link rel="stylesheet" href="css/main.css" />
+    <link rel="stylesheet" href="monitoring.css" />
   </head>
   <body>
     <!-- Main Container -->
@@ -150,11 +150,8 @@
 
       // Update coordinates on mouse move
       map.on("mousemove", function (e) {
-        document.getElementById(
-          "coordinates"
-        ).textContent = `${e.latlng.lat.toFixed(4)}° N, ${e.latlng.lng.toFixed(
-          4
-        )}° E`;
+        document.getElementById("coordinates").textContent =
+          `${e.latlng.lat.toFixed(4)}° N, ${e.latlng.lng.toFixed(4)}° E`;
       });
 
       // Sidebar interactions
