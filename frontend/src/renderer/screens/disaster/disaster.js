@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 let currentSection = "news";
 let isSearching = false;
 
@@ -5,11 +8,16 @@ let isSearching = false;
 const menuItems = document.querySelectorAll(".menu-item");
 const searchInput = document.getElementById("searchInput");
 const searchBtn = document.getElementById("searchBtn");
+const reportBtn = document.getElementById("reportBtn");
 const refreshBtn = document.getElementById("refreshBtn");
 const defaultContent = document.getElementById("defaultContent");
 const newsResults = document.getElementById("newsResults");
+const reportSection = document.getElementById("reportSection");
 const sectionTitle = document.getElementById("sectionTitle");
 const resultsContainer = document.getElementById("resultsContainer");
+const reportContainer = document.getElementById("reportContainer");
+const downloadReportBtn = document.getElementById("downloadReportBtn");
+const logsContent = document.querySelector(".logs-content");
 
 // Menu Item Interactions
 menuItems.forEach((item) => {
@@ -34,6 +42,9 @@ searchInput.addEventListener("keypress", function (e) {
   }
 });
 
+// Generate Report functionality
+reportBtn.addEventListener("click", generateReport);
+
 // Refresh button
 refreshBtn.addEventListener("click", function () {
   if (isSearching) {
@@ -54,13 +65,15 @@ function updateSectionTitle() {
 
 function performSearch() {
   const query = searchInput.value.trim();
-  if (!query) return;
+  if (!query) {
+    addLog("error", "Please enter a search query.");
+    return;
+  }
 
   isSearching = true;
   showNewsResults();
   showLoading();
 
-  // Simulate API call - replace with actual endpoint
   fetch("http://localhost:5000/api/news", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -72,10 +85,47 @@ function performSearch() {
     .then((res) => res.json())
     .then((data) => {
       displayResults(data);
+      addLog("info", `Fetched ${data.articles.length} articles for "${query}"`);
     })
     .catch((err) => {
       showError("Error fetching news. Please try again.");
+      addLog("error", "Error fetching news: " + err.message);
       console.error("Search error:", err);
+    });
+}
+
+function generateReport() {
+  const query = searchInput.value.trim();
+  if (!query) {
+    addLog("error", "Please enter a search query to generate a report.");
+    return;
+  }
+
+  showReportSection();
+  reportContainer.innerHTML = '<div class="loading">Generating report...</div>';
+  addLog("info", `Generating report for "${query}"`);
+
+  fetch("http://localhost:5000/api/generate_report", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: query }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.error) {
+        reportContainer.innerHTML = `<div class="error">${data.error}</div>`;
+        addLog("error", `Report generation failed: ${data.error}`);
+        return;
+      }
+      // Render Markdown manually
+      const html = markdownToHtml(data.report);
+      reportContainer.innerHTML = `<div class="report-content">${html}</div>`;
+      addLog("info", "Report generated successfully");
+    })
+    .catch((err) => {
+      reportContainer.innerHTML = `<div class="error">Error generating report. Please try again.</div>`;
+      addLog("error", "Error generating report: " + err.message);
+      console.error("Report error:", err);
     });
 }
 
@@ -84,11 +134,19 @@ function loadDefaultContent() {
   searchInput.value = "";
   defaultContent.style.display = "block";
   newsResults.style.display = "none";
+  reportSection.style.display = "none";
 }
 
 function showNewsResults() {
   defaultContent.style.display = "none";
   newsResults.style.display = "block";
+  reportSection.style.display = "none";
+}
+
+function showReportSection() {
+  defaultContent.style.display = "none";
+  newsResults.style.display = "none";
+  reportSection.style.display = "block";
 }
 
 function showLoading() {
@@ -113,19 +171,11 @@ function displayResults(data) {
           <div class="news-article">
             <h3>${escapeHtml(article.title || "Untitled")}</h3>
             <p>${escapeHtml(
-              article.description || "No description available."
+              article.snippet || "No description available."
             )}</p>
             <a href="${escapeHtml(
-              article.url || "#"
+              article.link || "#"
             )}" target="_blank" rel="noopener noreferrer">Read more →</a>
-            <div class="news-meta">
-              ${article.source ? `Source: ${escapeHtml(article.source)}` : ""} 
-              ${
-                article.publishedAt
-                  ? `• ${new Date(article.publishedAt).toLocaleDateString()}`
-                  : ""
-              }
-            </div>
           </div>
         `
     )
@@ -146,6 +196,52 @@ function escapeHtml(text) {
     return map[m];
   });
 }
+
+function addLog(type, message) {
+  const logClass = type === "error" ? "log-error" : "log-warning";
+  const logDiv = document.createElement("div");
+  logDiv.className = logClass;
+  logDiv.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+  logsContent.prepend(logDiv);
+  // Limit logs to prevent overflow
+  while (logsContent.children.length > 10) {
+    logsContent.removeChild(logsContent.lastChild);
+  }
+}
+
+// Simple Markdown to HTML converter for report rendering
+function markdownToHtml(markdown) {
+  let html = markdown
+    .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+    .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+    .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/^- (.*$)/gm, '<li>$1</li>')
+    .replace(/(\n<li>.*)+/g, '<ul>$&</ul>')
+    .replace(/\n/g, '<br>');
+  return html;
+}
+
+// Download report
+downloadReportBtn.addEventListener("click", function () {
+  const query = searchInput.value.trim() || "disaster_report";
+  const reportContent = reportContainer.querySelector(".report-content");
+  if (!reportContent) {
+    addLog("error", "No report available to download.");
+    return;
+  }
+  const text = reportContent.innerText;
+  const filename = `disaster_report_${query.replace(/\s+/g, '_')}.md`;
+  const filePath = path.join(process.env.HOME || process.env.USERPROFILE, 'Downloads', filename);
+
+  try {
+    fs.writeFileSync(filePath, text);
+    addLog("info", "Report downloaded successfully to Downloads folder");
+  } catch (error) {
+    addLog("error", `Download failed: ${error.message}`);
+  }
+});
 
 // Screen switching functionality
 document.addEventListener("DOMContentLoaded", function () {
@@ -211,7 +307,6 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log("Already on Disaster Analysis screen");
         break;
       case "analytics":
-        // Navigate to analytics (you can create this later)
         console.log("Analytics screen not implemented yet");
         break;
     }
