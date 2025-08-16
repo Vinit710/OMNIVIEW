@@ -1,6 +1,6 @@
-const { app, BrowserWindow, Menu } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain } = require("electron");
 const path = require("path");
-const { exec } = require("child_process");
+const fs = require("fs");
 
 // Create application menu
 const template = [
@@ -11,7 +11,6 @@ const template = [
         label: "New Project",
         accelerator: "CmdOrCtrl+N",
         click: () => {
-          // Handle new project
           mainWindow.webContents.send("menu-new-project");
         },
       },
@@ -19,7 +18,6 @@ const template = [
         label: "Open Project",
         accelerator: "CmdOrCtrl+O",
         click: () => {
-          // Handle open project
           mainWindow.webContents.send("menu-open-project");
         },
       },
@@ -143,26 +141,34 @@ const template = [
   },
 ];
 
-const menu = Menu.buildFromTemplate(template);
-Menu.setApplicationMenu(menu);
+let mainWindow;
 
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
     },
-    icon: path.join(__dirname, "../assets/icon.png"),
+    icon: path.join(__dirname, "../../assets/icon.png"),
   });
-  win.loadFile(
-    path.join(__dirname, "../renderer/screens/monitoring/monitoring.html")
+  mainWindow.loadFile(
+    path.join(__dirname, "../renderer/screens/disaster/disaster.html")
   );
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
 }
 
 app.whenReady().then(() => {
   createWindow();
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
 });
 
 app.on("window-all-closed", () => {
