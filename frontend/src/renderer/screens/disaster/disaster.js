@@ -3,6 +3,11 @@ const path = require('path');
 
 let currentSection = "news";
 let isSearching = false;
+const postDisasterSection = document.getElementById("postDisasterSection");
+let mapInitialized = false;
+let disasterPoints = []; // Store all points for filtering
+let map, markersLayer;
+
 
 // DOM Elements
 const menuItems = document.querySelectorAll(".menu-item");
@@ -28,7 +33,9 @@ menuItems.forEach((item) => {
     currentSection = this.getAttribute("data-section");
     updateSectionTitle();
 
-    if (!isSearching) {
+    if (currentSection === "post-disaster") {
+      showPostDisaster();
+    } else if (!isSearching) {
       loadDefaultContent();
     }
   });
@@ -135,7 +142,9 @@ function loadDefaultContent() {
   defaultContent.style.display = "block";
   newsResults.style.display = "none";
   reportSection.style.display = "none";
+  postDisasterSection.style.display = "none";
 }
+
 
 function showNewsResults() {
   defaultContent.style.display = "none";
@@ -312,6 +321,107 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 });
+function showPostDisaster() {
+  defaultContent.style.display = "none";
+  newsResults.style.display = "none";
+  reportSection.style.display = "none";
+  postDisasterSection.style.display = "block";
+
+  if (!mapInitialized) {
+    initMap();
+    mapInitialized = true;
+  }
+}
+
+function initMap() {
+  map = L.map("map").setView([20, 0], 2);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+    attribution: "&copy; OpenStreetMap contributors",
+  }).addTo(map);
+
+  markersLayer = L.layerGroup().addTo(map);
+
+  fetch("http://localhost:5000/api/disaster-csv")
+    .then((res) => res.json())
+    .then((points) => {
+      disasterPoints = points;
+      populateCountryFilter(points);
+      populateYearFilter(points);
+
+      // Show only India disasters by default (all years)
+      document.getElementById("countryFilter").value = "India";
+      document.getElementById("yearFilter").value = "";
+      filterAndRenderMarkers();
+    })
+    .catch((err) => {
+      addLog("error", "Failed to load disaster points: " + err.message);
+      console.error("CSV load error:", err);
+    });
+
+  document.getElementById("countryFilter").addEventListener("change", filterAndRenderMarkers);
+  document.getElementById("yearFilter").addEventListener("change", filterAndRenderMarkers);
+}
+
+function filterAndRenderMarkers() {
+  const selectedCountry = document.getElementById("countryFilter").value;
+  const selectedYear = document.getElementById("yearFilter").value;
+  let filtered = disasterPoints;
+
+  if (selectedCountry) {
+    filtered = filtered.filter(pt => pt.country && pt.country.toLowerCase() === selectedCountry.toLowerCase());
+  }
+  if (selectedYear) {
+    filtered = filtered.filter(pt => String(pt.year) === selectedYear);
+  }
+  renderDisasterMarkers(filtered);
+}
+
+function renderDisasterMarkers(points) {
+  markersLayer.clearLayers();
+  const latlngs = [];
+  points.forEach((pt) => {
+    if (pt.latitude && pt.longitude) {
+      latlngs.push([pt.latitude, pt.longitude]);
+      L.marker([pt.latitude, pt.longitude], {
+        title: pt.location
+      })
+      .addTo(markersLayer)
+      .bindPopup(
+        `<b>${pt.disastertype || "Disaster"}</b><br>
+         <b>Year:</b> ${pt.year || "N/A"}<br>
+         <b>Location:</b> ${pt.location || "N/A"}<br>
+         <b>Country:</b> ${pt.country || "N/A"}`
+      );
+    }
+  });
+  if (latlngs.length) map.fitBounds(latlngs);
+}
+
+function populateCountryFilter(points) {
+  const countrySet = new Set(points.map(pt => pt.country).filter(Boolean));
+  const countryFilter = document.getElementById("countryFilter");
+  countryFilter.innerHTML = '<option value="">All Countries</option>';
+  Array.from(countrySet).sort().forEach(country => {
+    const opt = document.createElement("option");
+    opt.value = country;
+    opt.textContent = country;
+    countryFilter.appendChild(opt);
+  });
+}
+
+function populateYearFilter(points) {
+  const yearSet = new Set(points.map(pt => pt.year).filter(Boolean));
+  const yearFilter = document.getElementById("yearFilter");
+  yearFilter.innerHTML = '<option value="">All Years</option>';
+  Array.from(yearSet).sort().forEach(year => {
+    const opt = document.createElement("option");
+    opt.value = year;
+    opt.textContent = year;
+    yearFilter.appendChild(opt);
+  });
+}
 
 // Initialize
 updateSectionTitle();
