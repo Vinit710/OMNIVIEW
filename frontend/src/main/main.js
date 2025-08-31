@@ -151,7 +151,7 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
     },
-    icon: path.join(__dirname, "../../assets/icon.png"),
+    icon: path.join(__dirname, "../assets/icon.png"),
   });
   mainWindow.loadFile(
     path.join(__dirname, "../renderer/screens/disaster/disaster.html")
