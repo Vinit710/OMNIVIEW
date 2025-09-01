@@ -1,1 +1,328 @@
-const fs=require("fs"),path=require("path");let currentSection="news",isSearching=!1;const postDisasterSection=document.getElementById("postDisasterSection");let map,markersLayer,mapInitialized=!1,disasterPoints=[];const menuItems=document.querySelectorAll(".menu-item"),searchInput=document.getElementById("searchInput"),searchBtn=document.getElementById("searchBtn"),reportBtn=document.getElementById("reportBtn"),refreshBtn=document.getElementById("refreshBtn"),defaultContent=document.getElementById("defaultContent"),newsResults=document.getElementById("newsResults"),reportSection=document.getElementById("reportSection"),sectionTitle=document.getElementById("sectionTitle"),resultsContainer=document.getElementById("resultsContainer"),reportContainer=document.getElementById("reportContainer"),downloadReportBtn=document.getElementById("downloadReportBtn"),logsContent=document.querySelector(".logs-content");function updateSectionTitle(){sectionTitle.textContent={news:"Latest News","post-disaster":"Post Disaster Reports","pre-disaster":"Pre Disaster Alerts"}[currentSection]||"News Dashboard"}function performSearch(){const e=searchInput.value.trim();e?(isSearching=!0,showNewsResults(),showLoading(),fetch("http://localhost:5000/api/news",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:e,section:currentSection})}).then(e=>e.json()).then(t=>{displayResults(t),addLog("info",`Fetched ${t.articles.length} articles for "${e}"`)}).catch(e=>{showError("Error fetching news. Please try again."),addLog("error","Error fetching news: "+e.message),console.error("Search error:",e)})):addLog("error","Please enter a search query.")}function generateReport(){const e=searchInput.value.trim();e?(showReportSection(),reportContainer.innerHTML='<div class="loading">Generating report...</div>',addLog("info",`Generating report for "${e}"`),fetch("http://localhost:5000/api/generate_report",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:e})}).then(e=>e.json()).then(e=>{if(e.error)return reportContainer.innerHTML=`<div class="error">${e.error}</div>`,void addLog("error",`Report generation failed: ${e.error}`);const t=markdownToHtml(e.report);reportContainer.innerHTML=`<div class="report-content">${t}</div>`,addLog("info","Report generated successfully")}).catch(e=>{reportContainer.innerHTML='<div class="error">Error generating report. Please try again.</div>',addLog("error","Error generating report: "+e.message),console.error("Report error:",e)})):addLog("error","Please enter a search query to generate a report.")}function loadDefaultContent(){isSearching=!1,searchInput.value="",defaultContent.style.display="block",newsResults.style.display="none",reportSection.style.display="none",postDisasterSection.style.display="none"}function showNewsResults(){defaultContent.style.display="none",newsResults.style.display="block",reportSection.style.display="none"}function showReportSection(){defaultContent.style.display="none",newsResults.style.display="none",reportSection.style.display="block"}function showLoading(){resultsContainer.innerHTML='<div class="loading">Loading news articles...</div>'}function showError(e){resultsContainer.innerHTML=`<div class="error">${e}</div>`}function displayResults(e){if(!e.articles||0===e.articles.length)return void(resultsContainer.innerHTML='<div class="error">No articles found for your search query.</div>');const t=e.articles.map(e=>`\n          <div class="news-article">\n            <h3>${escapeHtml(e.title||"Untitled")}</h3>\n            <p>${escapeHtml(e.snippet||"No description available.")}</p>\n            <a href="${escapeHtml(e.link||"#")}" target="_blank" rel="noopener noreferrer">Read more →</a>\n          </div>\n        `).join("");resultsContainer.innerHTML=t}function escapeHtml(e){const t={"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"};return e.replace(/[&<>"']/g,function(e){return t[e]})}function addLog(e,t){const n="error"===e?"log-error":"log-warning",r=document.createElement("div");for(r.className=n,r.textContent=`${(new Date).toLocaleTimeString()}: ${t}`,logsContent.prepend(r);logsContent.children.length>10;)logsContent.removeChild(logsContent.lastChild)}function markdownToHtml(e){return e.replace(/^# (.*$)/gm,"<h1>$1</h1>").replace(/^## (.*$)/gm,"<h2>$1</h2>").replace(/^### (.*$)/gm,"<h3>$1</h3>").replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>").replace(/\*(.*?)\*/g,"<em>$1</em>").replace(/^- (.*$)/gm,"<li>$1</li>").replace(/(\n<li>.*)+/g,"<ul>$&</ul>").replace(/\n/g,"<br>")}function showPostDisaster(){defaultContent.style.display="none",newsResults.style.display="none",reportSection.style.display="none",postDisasterSection.style.display="block",mapInitialized||(initMap(),mapInitialized=!0)}function initMap(){map=L.map("map").setView([20,0],2),L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"&copy; OpenStreetMap contributors"}).addTo(map),markersLayer=L.layerGroup().addTo(map),fetch("http://localhost:5000/api/disaster-csv").then(e=>e.json()).then(e=>{disasterPoints=e,populateCountryFilter(e),populateYearFilter(e),document.getElementById("countryFilter").value="India",document.getElementById("yearFilter").value="2010",filterAndRenderMarkers()}).catch(e=>{addLog("error","Failed to load disaster points: "+e.message),console.error("CSV load error:",e)}),document.getElementById("countryFilter").addEventListener("change",filterAndRenderMarkers),document.getElementById("yearFilter").addEventListener("change",filterAndRenderMarkers)}function filterAndRenderMarkers(){const e=document.getElementById("countryFilter").value,t=document.getElementById("yearFilter").value;let n=disasterPoints;e&&(n=n.filter(t=>t.country&&t.country.toLowerCase()===e.toLowerCase())),t&&(n=n.filter(e=>String(e.year)===t)),renderDisasterMarkers(n)}function renderDisasterMarkers(e){markersLayer.clearLayers();const t=[];e.forEach(e=>{e.latitude&&e.longitude&&(t.push([e.latitude,e.longitude]),L.marker([e.latitude,e.longitude],{title:e.location}).addTo(markersLayer).bindPopup(`<b>${e.disastertype||"Disaster"}</b><br>\n         <b>Year:</b> ${e.year||"N/A"}<br>\n         <b>Location:</b> ${e.location||"N/A"}<br>\n         <b>Country:</b> ${e.country||"N/A"}`))}),t.length&&map.fitBounds(t)}function populateCountryFilter(e){const t=new Set(e.map(e=>e.country).filter(Boolean)),n=document.getElementById("countryFilter");n.innerHTML='<option value="">All Countries</option>',Array.from(t).sort().forEach(e=>{const t=document.createElement("option");t.value=e,t.textContent=e,n.appendChild(t)})}function populateYearFilter(e){const t=new Set(e.map(e=>e.year).filter(Boolean)),n=document.getElementById("yearFilter");n.innerHTML='<option value="">All Years</option>',Array.from(t).sort().forEach(e=>{const t=document.createElement("option");t.value=e,t.textContent=e,n.appendChild(t)})}menuItems.forEach(e=>{e.addEventListener("click",function(){menuItems.forEach(e=>e.classList.remove("active")),this.classList.add("active"),currentSection=this.getAttribute("data-section"),updateSectionTitle(),"post-disaster"===currentSection?showPostDisaster():isSearching||loadDefaultContent()})}),searchBtn.addEventListener("click",performSearch),searchInput.addEventListener("keypress",function(e){"Enter"===e.key&&performSearch()}),reportBtn.addEventListener("click",generateReport),refreshBtn.addEventListener("click",function(){isSearching?performSearch():loadDefaultContent()}),downloadReportBtn.addEventListener("click",function(){const e=searchInput.value.trim()||"disaster_report",t=reportContainer.querySelector(".report-content");if(!t)return void addLog("error","No report available to download.");const n=t.innerText,r=`disaster_report_${e.replace(/\s+/g,"_")}.md`,o=path.join(process.env.HOME||process.env.USERPROFILE,"Downloads",r);try{fs.writeFileSync(o,n),addLog("info","Report downloaded successfully to Downloads folder")}catch(e){addLog("error",`Download failed: ${e.message}`)}}),document.addEventListener("DOMContentLoaded",function(){const e=document.getElementById("sidebarTitle"),t=document.getElementById("screenDropdown"),n=document.querySelector(".dropdown-arrow"),r=document.querySelectorAll(".dropdown-item"),o=document.querySelector(".sidebar-title-container");o.addEventListener("click",function(e){e.preventDefault(),e.stopPropagation(),t.classList.toggle("show"),n.classList.toggle("rotated")}),window.addEventListener("click",function(e){o.contains(e.target)||(t.classList.remove("show"),n.classList.remove("rotated"))}),t.addEventListener("click",function(e){e.stopPropagation()}),r.forEach(o=>{o.addEventListener("click",function(o){o.stopPropagation();const s=this.getAttribute("data-screen"),a=this.querySelector("span").textContent;r.forEach(e=>e.classList.remove("active")),this.classList.add("active"),e.textContent=a,t.classList.remove("show"),n.classList.remove("rotated"),function(e){switch(e){case"monitoring":window.location.href="../monitoring/monitoring.html";break;case"disaster":console.log("Already on Disaster Analysis screen");break;case"analytics":console.log("Analytics screen not implemented yet")}}(s)})})}),updateSectionTitle(),loadDefaultContent(),document.querySelector(".expand-btn").addEventListener("click",function(){const e=document.querySelector(".bottom-panel");"300px"===e.style.height?(e.style.height="120px",this.textContent="Expand ▲"):(e.style.height="300px",this.textContent="Collapse ▼")});
+const fs = require("fs"),
+  path = require("path");
+let currentSection = "news",
+  isSearching = !1;
+const postDisasterSection = document.getElementById("postDisasterSection");
+let map,
+  markersLayer,
+  mapInitialized = !1,
+  disasterPoints = [];
+const menuItems = document.querySelectorAll(".menu-item"),
+  searchInput = document.getElementById("searchInput"),
+  searchBtn = document.getElementById("searchBtn"),
+  reportBtn = document.getElementById("reportBtn"),
+  refreshBtn = document.getElementById("refreshBtn"),
+  defaultContent = document.getElementById("defaultContent"),
+  newsResults = document.getElementById("newsResults"),
+  reportSection = document.getElementById("reportSection"),
+  sectionTitle = document.getElementById("sectionTitle"),
+  resultsContainer = document.getElementById("resultsContainer"),
+  reportContainer = document.getElementById("reportContainer"),
+  downloadReportBtn = document.getElementById("downloadReportBtn"),
+  logsContent = document.querySelector(".logs-content");
+function updateSectionTitle() {
+  sectionTitle.textContent =
+    {
+      news: "Latest News",
+      "post-disaster": "Post Disaster Reports",
+      "pre-disaster": "Pre Disaster Alerts",
+    }[currentSection] || "News Dashboard";
+}
+function performSearch() {
+  const e = searchInput.value.trim();
+  e
+    ? ((isSearching = !0),
+      showNewsResults(),
+      showLoading(),
+      fetch("http://localhost:5000/api/news", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: e, section: currentSection }),
+      })
+        .then((e) => e.json())
+        .then((t) => {
+          (displayResults(t),
+            addLog("info", `Fetched ${t.articles.length} articles for "${e}"`));
+        })
+        .catch((e) => {
+          (showError("Error fetching news. Please try again."),
+            addLog("error", "Error fetching news: " + e.message),
+            console.error("Search error:", e));
+        }))
+    : addLog("error", "Please enter a search query.");
+}
+function generateReport() {
+  const e = searchInput.value.trim();
+  e
+    ? (showReportSection(),
+      (reportContainer.innerHTML =
+        '<div class="loading">Generating report...</div>'),
+      addLog("info", `Generating report for "${e}"`),
+      fetch("http://localhost:5000/api/generate_report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: e }),
+      })
+        .then((e) => e.json())
+        .then((e) => {
+          if (e.error)
+            return (
+              (reportContainer.innerHTML = `<div class="error">${e.error}</div>`),
+              void addLog("error", `Report generation failed: ${e.error}`)
+            );
+          const t = markdownToHtml(e.report);
+          ((reportContainer.innerHTML = `<div class="report-content">${t}</div>`),
+            addLog("info", "Report generated successfully"));
+        })
+        .catch((e) => {
+          ((reportContainer.innerHTML =
+            '<div class="error">Error generating report. Please try again.</div>'),
+            addLog("error", "Error generating report: " + e.message),
+            console.error("Report error:", e));
+        }))
+    : addLog("error", "Please enter a search query to generate a report.");
+}
+function loadDefaultContent() {
+  ((isSearching = !1),
+    (searchInput.value = ""),
+    (defaultContent.style.display = "block"),
+    (newsResults.style.display = "none"),
+    (reportSection.style.display = "none"),
+    (postDisasterSection.style.display = "none"));
+}
+function showNewsResults() {
+  ((defaultContent.style.display = "none"),
+    (newsResults.style.display = "block"),
+    (reportSection.style.display = "none"));
+}
+function showReportSection() {
+  ((defaultContent.style.display = "none"),
+    (newsResults.style.display = "none"),
+    (reportSection.style.display = "block"));
+}
+function showLoading() {
+  resultsContainer.innerHTML =
+    '<div class="loading">Loading news articles...</div>';
+}
+function showError(e) {
+  resultsContainer.innerHTML = `<div class="error">${e}</div>`;
+}
+function displayResults(e) {
+  if (!e.articles || 0 === e.articles.length)
+    return void (resultsContainer.innerHTML =
+      '<div class="error">No articles found for your search query.</div>');
+  const t = e.articles
+    .map(
+      (e) =>
+        `\n          <div class="news-article">\n            <h3>${escapeHtml(e.title || "Untitled")}</h3>\n            <p>${escapeHtml(e.snippet || "No description available.")}</p>\n            <a href="${escapeHtml(e.link || "#")}" target="_blank" rel="noopener noreferrer">Read more →</a>\n          </div>\n        `
+    )
+    .join("");
+  resultsContainer.innerHTML = t;
+}
+function escapeHtml(e) {
+  const t = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  };
+  return e.replace(/[&<>"']/g, function (e) {
+    return t[e];
+  });
+}
+function addLog(e, t) {
+  const n = "error" === e ? "log-error" : "log-warning",
+    r = document.createElement("div");
+  for (
+    r.className = n,
+      r.textContent = `${new Date().toLocaleTimeString()}: ${t}`,
+      logsContent.prepend(r);
+    logsContent.children.length > 10;
+
+  )
+    logsContent.removeChild(logsContent.lastChild);
+}
+function markdownToHtml(e) {
+  return e
+    .replace(/^# (.*$)/gm, "<h1>$1</h1>")
+    .replace(/^## (.*$)/gm, "<h2>$1</h2>")
+    .replace(/^### (.*$)/gm, "<h3>$1</h3>")
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/^- (.*$)/gm, "<li>$1</li>")
+    .replace(/(\n<li>.*)+/g, "<ul>$&</ul>")
+    .replace(/\n/g, "<br>");
+}
+function showPostDisaster() {
+  ((defaultContent.style.display = "none"),
+    (newsResults.style.display = "none"),
+    (reportSection.style.display = "none"),
+    (postDisasterSection.style.display = "block"),
+    mapInitialized || (initMap(), (mapInitialized = !0)));
+}
+function initMap() {
+  ((map = L.map("map").setView([20, 0], 2)),
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map),
+    (markersLayer = L.layerGroup().addTo(map)),
+    fetch("http://localhost:5000/api/disaster-csv")
+      .then((e) => e.json())
+      .then((e) => {
+        ((disasterPoints = e),
+          populateCountryFilter(e),
+          populateYearFilter(e),
+          (document.getElementById("countryFilter").value = "India"),
+          (document.getElementById("yearFilter").value = "2010"),
+          filterAndRenderMarkers());
+      })
+      .catch((e) => {
+        (addLog("error", "Failed to load disaster points: " + e.message),
+          console.error("CSV load error:", e));
+      }),
+    document
+      .getElementById("countryFilter")
+      .addEventListener("change", filterAndRenderMarkers),
+    document
+      .getElementById("yearFilter")
+      .addEventListener("change", filterAndRenderMarkers));
+}
+function filterAndRenderMarkers() {
+  const e = document.getElementById("countryFilter").value,
+    t = document.getElementById("yearFilter").value;
+  let n = disasterPoints;
+  (e &&
+    (n = n.filter(
+      (t) => t.country && t.country.toLowerCase() === e.toLowerCase()
+    )),
+    t && (n = n.filter((e) => String(e.year) === t)),
+    renderDisasterMarkers(n));
+}
+function renderDisasterMarkers(e) {
+  markersLayer.clearLayers();
+  const t = [];
+  (e.forEach((e) => {
+    e.latitude &&
+      e.longitude &&
+      (t.push([e.latitude, e.longitude]),
+      L.marker([e.latitude, e.longitude], { title: e.location })
+        .addTo(markersLayer)
+        .bindPopup(
+          `<b>${e.disastertype || "Disaster"}</b><br>\n         <b>Year:</b> ${e.year || "N/A"}<br>\n         <b>Location:</b> ${e.location || "N/A"}<br>\n         <b>Country:</b> ${e.country || "N/A"}`
+        ));
+  }),
+    t.length && map.fitBounds(t));
+}
+function populateCountryFilter(e) {
+  const t = new Set(e.map((e) => e.country).filter(Boolean)),
+    n = document.getElementById("countryFilter");
+  ((n.innerHTML = '<option value="">All Countries</option>'),
+    Array.from(t)
+      .sort()
+      .forEach((e) => {
+        const t = document.createElement("option");
+        ((t.value = e), (t.textContent = e), n.appendChild(t));
+      }));
+}
+function populateYearFilter(e) {
+  const t = new Set(e.map((e) => e.year).filter(Boolean)),
+    n = document.getElementById("yearFilter");
+  ((n.innerHTML = '<option value="">All Years</option>'),
+    Array.from(t)
+      .sort()
+      .forEach((e) => {
+        const t = document.createElement("option");
+        ((t.value = e), (t.textContent = e), n.appendChild(t));
+      }));
+}
+(menuItems.forEach((e) => {
+  e.addEventListener("click", function () {
+    (menuItems.forEach((e) => e.classList.remove("active")),
+      this.classList.add("active"),
+      (currentSection = this.getAttribute("data-section")),
+      updateSectionTitle(),
+      "post-disaster" === currentSection
+        ? showPostDisaster()
+        : isSearching || loadDefaultContent());
+  });
+}),
+  searchBtn.addEventListener("click", performSearch),
+  searchInput.addEventListener("keypress", function (e) {
+    "Enter" === e.key && performSearch();
+  }),
+  reportBtn.addEventListener("click", generateReport),
+  refreshBtn.addEventListener("click", function () {
+    isSearching ? performSearch() : loadDefaultContent();
+  }),
+  downloadReportBtn.addEventListener("click", function () {
+    const e = searchInput.value.trim() || "disaster_report",
+      t = reportContainer.querySelector(".report-content");
+    if (!t) return void addLog("error", "No report available to download.");
+    const n = t.innerText,
+      r = `disaster_report_${e.replace(/\s+/g, "_")}.md`,
+      o = path.join(
+        process.env.HOME || process.env.USERPROFILE,
+        "Downloads",
+        r
+      );
+    try {
+      (fs.writeFileSync(o, n),
+        addLog("info", "Report downloaded successfully to Downloads folder"));
+    } catch (e) {
+      addLog("error", `Download failed: ${e.message}`);
+    }
+  }),
+  document.addEventListener("DOMContentLoaded", function () {
+    const e = document.getElementById("sidebarTitle"),
+      t = document.getElementById("screenDropdown"),
+      n = document.querySelector(".dropdown-arrow"),
+      r = document.querySelectorAll(".dropdown-item"),
+      o = document.querySelector(".sidebar-title-container");
+    (o.addEventListener("click", function (e) {
+      (e.preventDefault(),
+        e.stopPropagation(),
+        t.classList.toggle("show"),
+        n.classList.toggle("rotated"));
+    }),
+      window.addEventListener("click", function (e) {
+        o.contains(e.target) ||
+          (t.classList.remove("show"), n.classList.remove("rotated"));
+      }),
+      t.addEventListener("click", function (e) {
+        e.stopPropagation();
+      }),
+      r.forEach((o) => {
+        o.addEventListener("click", function (o) {
+          o.stopPropagation();
+          const s = this.getAttribute("data-screen"),
+            a = this.querySelector("span").textContent;
+          (r.forEach((e) => e.classList.remove("active")),
+            this.classList.add("active"),
+            (e.textContent = a),
+            t.classList.remove("show"),
+            n.classList.remove("rotated"),
+            (function (e) {
+              switch (e) {
+                case "monitoring":
+                  window.location.href = "../monitoring/monitoring.html";
+                  break;
+                case "disaster":
+                  console.log("Already on Disaster Analysis screen");
+                  break;
+                case "analytics":
+                  console.log("Analytics screen not implemented yet");
+              }
+            })(s));
+        });
+      }));
+  }),
+  updateSectionTitle(),
+  loadDefaultContent(),
+  document.querySelector(".expand-btn").addEventListener("click", function () {
+    const e = document.querySelector(".bottom-panel");
+    "300px" === e.style.height
+      ? ((e.style.height = "120px"), (this.textContent = "Expand ▲"))
+      : ((e.style.height = "300px"), (this.textContent = "Collapse ▼"));
+  }));
