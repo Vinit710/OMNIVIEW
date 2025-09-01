@@ -6,13 +6,15 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-packager . omniview --platform=win32 --arch=x64  --overwrite",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dist": "node minify.js && electron-packager . omniview --platform=win32 --arch=x64 --overwrite --asar"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@electron/packager": "^18.4.0",
-    "electron": "^37.2.4"
+    "electron": "^37.2.4",
+    "terser": "^5.43.1"
   }
 }

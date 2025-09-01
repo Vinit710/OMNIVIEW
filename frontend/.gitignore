@@ -1,2 +1,4 @@
 node_modules
 omniview-win32-x64
+dist
+build
