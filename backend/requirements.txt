@@ -4,5 +4,14 @@ opencv-python
 scikit-learn
 numpy
 pillow
-
-pip install flask flask-cors requests google-generativeai python-dotenv matplotlib seaborn pandas numpy pillow
+requests
+gradio-client
+google-generativeai
+tweepy
+praw
+exifread
+spacy
+tqdm
+transformers
+geopy
+feedparser
