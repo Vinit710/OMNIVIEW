@@ -6,6 +6,8 @@ import tempfile
 from gradio_client import Client, handle_file
 import os
 import traceback
+from services.flight_data import start_flight_tracker, get_flights_data
+
 app = Flask(__name__)
 CORS(app)
 
@@ -139,9 +141,12 @@ def road_detection():
         app.logger.exception("Error in /api/road-detection: %s", e)
         return jsonify({"error": str(e), "traceback": tb}), 500
 
+@app.route("/api/flights")
+def flights():
+    return get_flights_data()
 
 if __name__ == "__main__":
+    # Start the flight tracker in background
+    flight_tracker = start_flight_tracker()
+    # Run the Flask app
     app.run(host="0.0.0.0", port=5000)
-
-if __name__ == "__main__":
-    app.run(port=5000)

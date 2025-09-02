@@ -1,12 +1,9 @@
 flask
 flask-cors
-opencv-python
-scikit-learn
-numpy
-pillow
 requests
 gradio-client
-google-generativeai
+pandas
+pillow
 tweepy
 praw
 exifread
