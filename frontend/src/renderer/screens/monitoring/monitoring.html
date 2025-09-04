@@ -10,7 +10,7 @@
     />
     <link rel="stylesheet" href="monitoring.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://unpkg.com/leaflet-rotatedmarker/leaflet.rotatedMarker.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js"></script>
   </head>
   <body>
     <!-- Main Container -->
@@ -382,9 +382,35 @@
           }
 
           // Limit number of aircraft to avoid performance issues
-          const maxPlanes = 1000;
+          const maxPlanes = 500;
           const planes = data.states.slice(0, maxPlanes);
 
+          // Create a function to generate rotated icons
+          function createRotatedPlaneIcon(heading) {
+            const iconHtml = `
+    <div style="
+      width: 32px; 
+      height: 32px; 
+      transform: rotate(${heading}deg);
+      transform-origin: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">
+      <img src="../../../assets/airplane.png" style="width: 32px; height: 32px;" alt="plane" />
+    </div>
+  `;
+
+            return L.divIcon({
+              html: iconHtml,
+              iconSize: [32, 32],
+              iconAnchor: [16, 16],
+              popupAnchor: [0, -16],
+              className: "custom-plane-icon",
+            });
+          }
+
+          // Then in your forEach loop:
           planes.forEach((state) => {
             const lat = state[6];
             const lon = state[5];
@@ -392,21 +418,22 @@
             const altitude = Math.round((state[7] || 0) * 3.28084);
             const velocity = Math.round((state[9] || 0) * 2.236936);
             const heading = state[10];
+
             if (lat && lon && !isNaN(lat) && !isNaN(lon)) {
               if (heading !== null && !isNaN(heading)) {
+                // Use the CSS-based rotated icon
+                const rotatedIcon = createRotatedPlaneIcon(heading);
+
                 const marker = L.marker([lat, lon], {
-                  icon: planeIcon,
-                  rotationAngle: heading, // no -90 hack
-                  rotationOrigin: "center center",
+                  icon: rotatedIcon,
                 });
 
                 marker.bindPopup(`
-            <b>Flight: ${callsign}</b><br>
-            Altitude: ${altitude} ft<br>
-            Speed: ${velocity} mph<br>
-            Heading: ${heading}°
-
-          `);
+        <b>Flight: ${callsign}</b><br>
+        Altitude: ${altitude} ft<br>
+        Speed: ${velocity} mph<br>
+        Heading: ${heading}°
+      `);
 
                 marker.addTo(aircraftLayer);
               }
