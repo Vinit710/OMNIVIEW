@@ -141,6 +141,22 @@
         maxBoundsViscosity: 1.0,
       });
 
+      // === Feature Layers ===
+      const featureLayers = {
+        buildings: L.layerGroup().addTo(map),
+        roads: L.layerGroup().addTo(map),
+        water: L.layerGroup().addTo(map),
+        ships: L.layerGroup().addTo(map),
+        aircraft: L.layerGroup().addTo(map)
+      };
+
+      // Track active features
+      let activeFeature = 'buildings';
+      let areaSelectMode = false;
+      let areaRectangle = null;
+      let selectedBounds = null;
+      
+
       // === Markers ===
       const cities = [{ name: "Pune", coords: [18.5204, 73.8567] }];
       cities.forEach((city) => {
@@ -154,12 +170,63 @@
       });
 
       // Sidebar interactions
-      document.querySelectorAll(".monitoring-item").forEach((item) => {
+      document.querySelectorAll(".monitoring-item").forEach((item, index) => {
         item.addEventListener("click", function () {
-          document
-            .querySelectorAll(".monitoring-item")
-            .forEach((i) => i.classList.remove("active"));
+          // Remove active class from all items
+          document.querySelectorAll(".monitoring-item")
+            .forEach(i => i.classList.remove("active"));
           this.classList.add("active");
+
+          // Clear all layers and stop any running processes
+          Object.values(featureLayers).forEach(layer => layer.clearLayers());
+          if (updateFlightsInterval) {
+            clearInterval(updateFlightsInterval);
+            updateFlightsInterval = null;
+          }
+
+          // Reset area selection mode
+          areaSelectMode = false;
+          if (areaRectangle) {
+            map.removeLayer(areaRectangle);
+            areaRectangle = null;
+          }
+          map.getContainer().style.cursor = "";
+
+          // Handle specific feature activation
+          switch(index) {
+            case 0: // Buildings
+              activeFeature = 'buildings';
+              // Add your buildings feature code here
+              break;
+
+            case 1: // Roads
+              activeFeature = 'roads';
+              areaSelectMode = true;
+              map.getContainer().style.cursor = "crosshair";
+              alert("Click on the map to select the center of a 1km x 1km area for road extraction.");
+              break;
+
+            case 2: // Water Bodies
+              activeFeature = 'water';
+              // Add your water bodies feature code here
+              break;
+
+            case 3: // Ships
+              activeFeature = 'ships';
+              // Add your ships feature code here
+              break;
+
+            case 4: // Aircraft
+              activeFeature = 'aircraft';
+              // Clear any existing interval
+              if (updateFlightsInterval) {
+                clearInterval(updateFlightsInterval);
+              }
+              // Start fresh tracking
+              updateFlights();
+              updateFlightsInterval = setInterval(updateFlights, 30000);
+              break;
+          }
         });
       });
 
@@ -192,10 +259,6 @@
           }
         });
 
-      let areaSelectMode = false;
-      let areaRectangle = null;
-      let selectedBounds = null;
-
       function getSquareBounds(center, sizeMeters = 1000) {
         const halfSizeLat = sizeMeters / 2 / 111000;
         const halfSizeLng =
@@ -221,7 +284,7 @@
         if (!areaSelectMode) return;
 
         if (areaRectangle) {
-          map.removeLayer(areaRectangle);
+          featureLayers.roads.removeLayer(areaRectangle);
           areaRectangle = null;
         }
 
@@ -229,8 +292,8 @@
         selectedBounds = bounds;
         areaRectangle = L.rectangle(bounds, {
           color: "#00a8e8",
-          weight: 2,
-        }).addTo(map);
+          weight: 2
+        }).addTo(featureLayers.roads);  // Add to roads layer
 
         areaRectangle
           .bindPopup(
@@ -248,7 +311,6 @@
           const extractBtn = document.getElementById("extractRoadsBtn");
           if (extractBtn) {
             extractBtn.onclick = async () => {
-              console.log("Extract Roads button clicked");
               areaSelectMode = false;
               map.getContainer().style.cursor = "";
               map.fitBounds(selectedBounds);
@@ -259,8 +321,26 @@
                   useCORS: true,
                   backgroundColor: null,
                 });
-                const imageBase64 = canvas.toDataURL("image/png");
-                console.log("Screenshot taken, sending to backend...");
+
+                // Get pixel coordinates for bounds
+                const nw = map.latLngToContainerPoint(selectedBounds[0]); // top-left
+                const se = map.latLngToContainerPoint(selectedBounds[1]); // bottom-right
+
+                // Calculate crop dimensions
+                const x = Math.min(nw.x, se.x);
+                const y = Math.min(nw.y, se.y);
+                const width = Math.abs(se.x - nw.x);
+                const height = Math.abs(se.y - nw.y);
+
+                // Crop the canvas
+                const croppedCanvas = document.createElement("canvas");
+                croppedCanvas.width = width;
+                croppedCanvas.height = height;
+                const ctx = croppedCanvas.getContext("2d");
+                ctx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
+
+                const imageBase64 = croppedCanvas.toDataURL("image/png");
+                console.log("Cropped screenshot taken, sending to backend...");
 
                 fetch("http://localhost:5000/api/road-detection", {
                   method: "POST",
@@ -270,11 +350,6 @@
                   .then(async (res) => {
                     const body = await res.json().catch(() => ({}));
                     if (!res.ok) {
-                      console.error(
-                        "Backend returned error:",
-                        res.status,
-                        body
-                      );
                       areaRectangle
                         .bindPopup(
                           `<b>Error</b><br>${body.error || "Server error"}`
@@ -282,33 +357,33 @@
                         .openPopup();
                       return;
                     }
-                    // success
-                    console.log("Backend data:", body);
                     const probMask = body.probability_mask;
-                    //const binUrl = body.binary_mask_url;
-
-                    if (!probMask) {
-                      console.error("Missing URLs in response:", body);
-                      areaRectangle
-                        .bindPopup(
-                          "<b>Error</b><br>Invalid response from backend."
-                        )
-                        .openPopup();
-                      return;
-                    }
-
                     areaRectangle
                       .bindPopup(
-                        `
-            <b>Road Detection Result</b><br>
-            <div><strong>Probability mask</strong><br><img src="${probMask}" style="width:100%;max-width:300px;"></div>
-
-          `
+                        `<b>Road Detection Result</b><br>
+      <div>
+        <strong>Probability mask</strong><br>
+        <img id="resultImg" src="${probMask}" style="width:100%;max-width:300px;"><br>
+        <button id="downloadBtn">Download Image</button>
+      </div>`
                       )
                       .openPopup();
+
+                    setTimeout(() => {
+                      const downloadBtn = document.getElementById("downloadBtn");
+                      if (downloadBtn) {
+                        downloadBtn.onclick = () => {
+                          const link = document.createElement("a");
+                          link.href = probMask;
+                          link.download = "road_mask.png";
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        };
+                      }
+                    }, 150);
                   })
                   .catch((err) => {
-                    console.error("Network or other error:", err);
                     areaRectangle
                       .bindPopup("Error extracting roads (network/server).")
                       .openPopup();
@@ -368,77 +443,55 @@
       async function updateFlights() {
         try {
           const res = await fetch("http://localhost:5000/api/flights");
-          if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`);
-          }
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          
           const data = await res.json();
+          // Only clear if we're on the aircraft tab
+          if (activeFeature === 'aircraft') {
+            featureLayers.aircraft.clearLayers();
 
-          // Clear old markers
-          aircraftLayer.clearLayers();
-
-          if (!data.states || !Array.isArray(data.states)) {
-            console.warn("No flight data available or invalid format");
-            return;
-          }
-
-          // Limit number of aircraft to avoid performance issues
-          const maxPlanes = 1000;
-          const planes = data.states.slice(0, maxPlanes);
-
-          planes.forEach((state) => {
-            const lat = state[6];
-            const lon = state[5];
-            const callsign = state[1]?.trim() || "Unknown";
-            const altitude = Math.round((state[7] || 0) * 3.28084);
-            const velocity = Math.round((state[9] || 0) * 2.236936);
-            const heading = state[10];
-            if (lat && lon && !isNaN(lat) && !isNaN(lon)) {
-              if (heading !== null && !isNaN(heading)) {
-                const marker = L.marker([lat, lon], {
-                  icon: planeIcon,
-                  rotationAngle: heading, // no -90 hack
-                  rotationOrigin: "center center",
-                });
-
-                marker.bindPopup(`
-            <b>Flight: ${callsign}</b><br>
-            Altitude: ${altitude} ft<br>
-            Speed: ${velocity} mph<br>
-            Heading: ${heading}°
-
-          `);
-
-                marker.addTo(aircraftLayer);
-              }
+            if (!data.states || !Array.isArray(data.states)) {
+              console.warn("No flight data available or invalid format");
+              return;
             }
-          });
 
-          console.log(`Updated ${planes.length} aircraft positions`);
+            const maxPlanes = 1000;
+            const planes = data.states.slice(0, maxPlanes);
+
+            planes.forEach((state) => {
+              const lat = state[6];
+              const lon = state[5];
+              if (lat && lon && !isNaN(lat) && !isNaN(lon)) {
+                const callsign = state[1]?.trim() || "Unknown";
+                const altitude = Math.round((state[7] || 0) * 3.28084);
+                const velocity = Math.round((state[9] || 0) * 2.236936);
+                const heading = state[10];
+
+                if (heading !== null && !isNaN(heading)) {
+                  const marker = L.marker([lat, lon], {
+                    icon: planeIcon,
+                    rotationAngle: heading,
+                    rotationOrigin: "center center"
+                  });
+
+                  marker.bindPopup(`
+                    <b>Flight: ${callsign}</b><br>
+                    Altitude: ${altitude} ft<br>
+                    Speed: ${velocity} mph<br>
+                    Heading: ${heading}°
+                  `);
+
+                  marker.addTo(featureLayers.aircraft);
+                }
+              }
+            });
+
+            console.log(`Updated ${planes.length} aircraft positions`);
+          }
         } catch (err) {
           console.error("Failed to fetch aircraft data:", err);
         }
       }
-
-      // Aircraft monitoring toggle
-      document
-        .querySelectorAll(".monitoring-item")[4]
-        .addEventListener("click", function () {
-          const isActive = this.classList.contains("active");
-
-          if (isActive) {
-            // Start updating flights
-            updateFlights(); // Initial update
-            updateFlightsInterval = setInterval(updateFlights, 30000); // Update every 30 seconds
-            console.log("Started flight tracking");
-          } else {
-            // Stop updating and clear the layer
-            if (updateFlightsInterval) {
-              clearInterval(updateFlightsInterval);
-            }
-            aircraftLayer.clearLayers();
-            console.log("Stopped flight tracking");
-          }
-        });
     </script>
   </body>
 </html>
