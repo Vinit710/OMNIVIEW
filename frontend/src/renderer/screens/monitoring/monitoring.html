@@ -432,7 +432,7 @@
       };
 
       // === Aircraft plotting ===
-      let aircraftLayer = L.layerGroup().addTo(map);
+      // let aircraftLayer = L.layerGroup().addTo(map);
       let updateFlightsInterval;
 
       // Create plane icon once
@@ -449,9 +449,10 @@
           if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
           const data = await res.json();
-          // Only clear if we're on the aircraft tab
+
+          // Only update if we're on the aircraft tab
           if (activeFeature === "aircraft") {
-            featureLayers.aircraft.clearLayers();
+            featureLayers.aircraft.clearLayers(); // Clear the correct layer
 
             if (!data.states || !Array.isArray(data.states)) {
               console.warn("No flight data available or invalid format");
@@ -461,21 +462,20 @@
             const maxPlanes = 1000;
             const planes = data.states.slice(0, maxPlanes);
 
-            // Create a function to generate rotated icons
             function createRotatedPlaneIcon(heading) {
               const iconHtml = `
-    <div style="
-      width: 32px; 
-      height: 32px; 
-      transform: rotate(${heading}deg);
-      transform-origin: center;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    ">
-      <img src="../../../assets/airplane.png" style="width: 32px; height: 32px;" alt="plane" />
-    </div>
-  `;
+          <div style="
+            width: 32px; 
+            height: 32px; 
+            transform: rotate(${heading}deg);
+            transform-origin: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <img src="../../../assets/airplane.png" style="width: 32px; height: 32px;" alt="plane" />
+          </div>
+        `;
 
               return L.divIcon({
                 html: iconHtml,
@@ -486,7 +486,6 @@
               });
             }
 
-            // Then in your forEach loop:
             planes.forEach((state) => {
               const lat = state[6];
               const lon = state[5];
@@ -497,21 +496,18 @@
 
               if (lat && lon && !isNaN(lat) && !isNaN(lon)) {
                 if (heading !== null && !isNaN(heading)) {
-                  // Use the CSS-based rotated icon
                   const rotatedIcon = createRotatedPlaneIcon(heading);
-
-                  const marker = L.marker([lat, lon], {
-                    icon: rotatedIcon,
-                  });
+                  const marker = L.marker([lat, lon], { icon: rotatedIcon });
 
                   marker.bindPopup(`
-        <b>Flight: ${callsign}</b><br>
-        Altitude: ${altitude} ft<br>
-        Speed: ${velocity} mph<br>
-        Heading: ${heading}°
-      `);
+              <b>Flight: ${callsign}</b><br>
+              Altitude: ${altitude} ft<br>
+              lat: ${lat.toFixed(4)}°, lon: ${lon.toFixed(4)}°<br>
+              Speed: ${velocity} mph<br>
+              Heading: ${heading}°
+            `);
 
-                  marker.addTo(aircraftLayer);
+                  marker.addTo(featureLayers.aircraft); // Add to the correct layer
                 }
               }
             });
