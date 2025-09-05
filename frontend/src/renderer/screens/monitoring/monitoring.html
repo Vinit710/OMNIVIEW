@@ -261,8 +261,8 @@
           }
         });
 
-      function getSquareBounds(center, sizeMeters = 1000) {
-        const halfSizeLat = sizeMeters / 2 / 111000;
+      function getSquareBounds(center, sizeMeters = 500) {
+        const halfSizeLat = sizeMeters / 2 / 111000; // Convert meters to degrees (approximately)
         const halfSizeLng =
           sizeMeters / 2 / (111000 * Math.cos((center.lat * Math.PI) / 180));
         return [
@@ -282,6 +282,7 @@
           );
         });
 
+      // Replace the existing map click handler
       map.on("click", function (e) {
         if (!areaSelectMode) return;
 
@@ -290,122 +291,174 @@
           areaRectangle = null;
         }
 
-        const bounds = getSquareBounds(e.latlng, 1000);
+        // Remove existing control if present
+        const existingControl = document.querySelector('.area-control');
+        if (existingControl) {
+          existingControl.remove();
+        }
+
+        // Initial bounds with 500m default
+        const bounds = getSquareBounds(e.latlng, 500);
         selectedBounds = bounds;
         areaRectangle = L.rectangle(bounds, {
           color: "#00a8e8",
           weight: 2,
-        }).addTo(featureLayers.roads); // Add to roads layer
+        }).addTo(featureLayers.roads);
 
-        areaRectangle
-          .bindPopup(
-            `
+        // Create custom control
+        const controlDiv = document.createElement('div');
+        controlDiv.className = 'area-control';
+        controlDiv.innerHTML = `
           <b>Area Selected</b><br>
-          Size: 1km x 1km<br>
+          <div style="margin-bottom: 10px;">
+            <label for="areaSize">Area Size (meters):</label>
+            <input type="number" id="areaSize" value="500" min="100" max="2000" step="100" style="width: 80px;">
+          </div>
           <button id="extractRoadsBtn">Extract Roads</button>
           <button id="cancelAreaBtn">Cancel</button>
-        `
-          )
-          .openPopup();
+        `;
 
-        setTimeout(() => {
-          // Extract Roads button handler
-          const extractBtn = document.getElementById("extractRoadsBtn");
-          if (extractBtn) {
-            extractBtn.onclick = async () => {
-              areaSelectMode = false;
-              map.getContainer().style.cursor = "";
-              map.fitBounds(selectedBounds);
+        // Add control to the map container
+        document.querySelector('.map-container').appendChild(controlDiv);
 
-              setTimeout(async () => {
-                const mapDiv = document.getElementById("map");
-                const canvas = await html2canvas(mapDiv, {
-                  useCORS: true,
-                  backgroundColor: null,
-                });
+        // Add size change handler
+        const sizeInput = document.getElementById("areaSize");
+        if (sizeInput) {
+          sizeInput.onchange = () => {
+            const newSize = parseInt(sizeInput.value);
+            if (newSize >= 100 && newSize <= 2000) {
+              const newBounds = getSquareBounds(e.latlng, newSize);
+              selectedBounds = newBounds;
+              areaRectangle.setBounds(newBounds);
+            }
+          };
+        }
 
-                // Get pixel coordinates for bounds
-                const nw = map.latLngToContainerPoint(selectedBounds[0]); // top-left
-                const se = map.latLngToContainerPoint(selectedBounds[1]); // bottom-right
+        // Extract Roads button handler
+        const extractBtn = document.getElementById("extractRoadsBtn");
+        if (extractBtn) {
+          extractBtn.onclick = async () => {
+            areaSelectMode = false;
+            map.getContainer().style.cursor = "";
+            map.fitBounds(selectedBounds);
 
-                // Calculate crop dimensions
-                const x = Math.min(nw.x, se.x);
-                const y = Math.min(nw.y, se.y);
-                const width = Math.abs(se.x - nw.x);
-                const height = Math.abs(se.y - nw.y);
+            // Remove the control before taking screenshot
+            controlDiv.style.display = 'none';
 
-                // Crop the canvas
-                const croppedCanvas = document.createElement("canvas");
-                croppedCanvas.width = width;
-                croppedCanvas.height = height;
-                const ctx = croppedCanvas.getContext("2d");
-                ctx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
+            setTimeout(async () => {
+              const mapDiv = document.getElementById("map");
+              const canvas = await html2canvas(mapDiv, {
+                useCORS: true,
+                backgroundColor: null,
+              });
 
-                const imageBase64 = croppedCanvas.toDataURL("image/png");
-                console.log("Cropped screenshot taken, sending to backend...");
+              // Get pixel coordinates for bounds
+              const nw = map.latLngToContainerPoint(selectedBounds[0]);
+              const se = map.latLngToContainerPoint(selectedBounds[1]);
 
-                fetch("http://localhost:5000/api/road-detection", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ image_base64: imageBase64 }),
-                })
-                  .then(async (res) => {
-                    const body = await res.json().catch(() => ({}));
-                    if (!res.ok) {
-                      areaRectangle
-                        .bindPopup(
-                          `<b>Error</b><br>${body.error || "Server error"}`
-                        )
-                        .openPopup();
-                      return;
+              // Calculate crop dimensions
+              const x = Math.min(nw.x, se.x);
+              const y = Math.min(nw.y, se.y);
+              const width = Math.abs(se.x - nw.x);
+              const height = Math.abs(se.y - nw.y);
+
+              // Crop the canvas
+              const croppedCanvas = document.createElement("canvas");
+              croppedCanvas.width = width;
+              croppedCanvas.height = height;
+              const ctx = croppedCanvas.getContext("2d");
+              ctx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
+
+              const imageBase64 = croppedCanvas.toDataURL("image/png");
+
+              // Show preview of cropped area
+              areaRectangle
+                .bindPopup(
+                  `<b>Processing Area</b><br>
+          <div>
+            <strong>Selected Area Image:</strong><br>
+            <img src="${imageBase64}" style="width:100%;max-width:300px;"><br>
+            <div style="text-align:center">Processing...</div>
+          </div>`
+                )
+                .openPopup();
+
+              fetch("http://localhost:5000/api/road-detection", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image_base64: imageBase64 }),
+              })
+                .then(async (res) => {
+                  const body = await res.json().catch(() => ({}));
+                  if (!res.ok) {
+                    areaRectangle
+                      .bindPopup(`<b>Error</b><br>${body.error || "Server error"}`)
+                      .openPopup();
+                    return;
+                  }
+                  const probMask = body.probability_mask;
+                  areaRectangle
+                    .bindPopup(
+                      `<b>Road Detection Result</b><br>
+              <div>
+                <strong>Input Image:</strong><br>
+                <img src="${imageBase64}" style="width:100%;max-width:300px;"><br>
+                <strong>Road Mask:</strong><br>
+                <img src="${probMask}" style="width:100%;max-width:300px;"><br>
+                <button id="downloadInputBtn">Download Input</button>
+                <button id="downloadMaskBtn">Download Mask</button>
+              </div>`
+                    )
+                    .openPopup();
+
+                  setTimeout(() => {
+                    // Download Input Image
+                    const downloadInputBtn = document.getElementById("downloadInputBtn");
+                    if (downloadInputBtn) {
+                      downloadInputBtn.onclick = () => {
+                        const link = document.createElement("a");
+                        link.href = imageBase64;
+                        link.download = "road_input.png";
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      };
                     }
-                    const probMask = body.probability_mask;
-                    areaRectangle
-                      .bindPopup(
-                        `<b>Road Detection Result</b><br>
-      <div>
-        <strong>Probability mask</strong><br>
-        <img id="resultImg" src="${probMask}" style="width:100%;max-width:300px;"><br>
-        <button id="downloadBtn">Download Image</button>
-      </div>`
-                      )
-                      .openPopup();
 
-                    setTimeout(() => {
-                      const downloadBtn =
-                        document.getElementById("downloadBtn");
-                      if (downloadBtn) {
-                        downloadBtn.onclick = () => {
-                          const link = document.createElement("a");
-                          link.href = probMask;
-                          link.download = "road_mask.png";
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        };
-                      }
-                    }, 150);
-                  })
-                  .catch((err) => {
-                    areaRectangle
-                      .bindPopup("Error extracting roads (network/server).")
-                      .openPopup();
-                  });
-              }, 1000);
-            };
-          }
+                    // Download Mask Image
+                    const downloadMaskBtn = document.getElementById("downloadMaskBtn");
+                    if (downloadMaskBtn) {
+                      downloadMaskBtn.onclick = () => {
+                        const link = document.createElement("a");
+                        link.href = probMask;
+                        link.download = "road_mask.png";
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      };
+                    }
+                  }, 150);
+                })
+                .catch((err) => {
+                  areaRectangle
+                    .bindPopup("Error extracting roads (network/server).")
+                    .openPopup();
+                });
+            }, 1000);
+          };
+        }
 
-          // Cancel button handler
-          const cancelBtn = document.getElementById("cancelAreaBtn");
-          if (cancelBtn) {
-            cancelBtn.onclick = () => {
-              map.removeLayer(areaRectangle);
-              areaRectangle = null;
-              areaSelectMode = false;
-              map.getContainer().style.cursor = "";
-            };
-          }
-        }, 150);
+        // Cancel button handler
+        const cancelBtn = document.getElementById("cancelAreaBtn");
+        if (cancelBtn) {
+          cancelBtn.onclick = () => {
+            map.removeLayer(areaRectangle);
+            areaRectangle = null;
+            areaSelectMode = false;
+            map.getContainer().style.cursor = "";
+            controlDiv.remove();
+          };
+        }
       });
 
       // Layer Switch Button Handlers
