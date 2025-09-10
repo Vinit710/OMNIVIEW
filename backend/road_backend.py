@@ -1,4 +1,3 @@
-
 from flask import Blueprint, jsonify, request
 import base64
 import tempfile
@@ -25,6 +24,8 @@ def satellite_image():
     bounds = data.get("bounds")
     image_url = "https://via.placeholder.com/300x300?text=Satellite+Image"
     return jsonify({"url": image_url})
+
+
 
 @road_bp.route("/api/extract-roads", methods=["POST"])
 def extract_roads():
@@ -95,3 +96,9 @@ def road_detection():
     except Exception as e:
         tb = traceback.format_exc()
         return jsonify({"error": str(e), "traceback": tb}), 500
+
+@road_bp.route("/api/disaster-geojson", methods=["POST"])
+def disaster_geojson():
+    data = request.json
+    geojson_data = data.get("geojson")
+    return jsonify({"message": "GeoJSON data received", "geojson": geojson_data})
