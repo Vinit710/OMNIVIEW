@@ -23,10 +23,10 @@ import time
 from urllib.parse import quote
 import random
 from road_backend import road_bp
-
+from services.flight_data import start_flight_tracker, get_flights_data
 
 # Load environment variables
-load_dotenv(dotenv_path="D:/PROJECTS/BEPROJECT/OMNIVIEW_CODE/OMNIVIEW/Backend/.env")
+load_dotenv()
 
 # Configure APIs with your keys
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -36,11 +36,16 @@ HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
+# Validate required API keys
+if not GEMINI_API_KEY or not GOOGLE_API_KEY or not GOOGLE_CX:
+    raise ValueError("Required API keys (GEMINI_API_KEY, GOOGLE_API_KEY, GOOGLE_CX) must be set in environment variables")
+
 # Configure Gemini
 genai.configure(api_key=GEMINI_API_KEY)
 
 app = Flask(__name__)
 CORS(app)
+from flask import send_file
 
 
 
@@ -1053,6 +1058,27 @@ def health_check():
         "uptime": "running",
         "version": "3.0"
     })
+@app.route("/api/flights")
+def flights():
+    return get_flights_data()
+
+
+
+@app.route("/api/disaster-geojson")
+def disaster_geojson():
+    # Path to your small geojson file
+    return send_file("disaster_national_sample.geojson", mimetype="application/json")
+
+import pandas as pd
+from flask import jsonify
+
+@app.route("/api/disaster-csv")
+def disaster_csv():
+    df = pd.read_csv("disaster_points.csv")  # Use your actual CSV filename
+    # Only keep necessary columns for frontend
+    data = df[["id", "country", "location", "disastertype", "year", "latitude", "longitude"]].to_dict(orient="records")
+    return jsonify(data)
+
 
 if __name__ == "__main__":
     print("🚀 STARTING AI DISASTER RESPONSE SYSTEM...")
@@ -1061,5 +1087,6 @@ if __name__ == "__main__":
     print("🌐 Server starting on http://localhost:5000")
     print("📝 Test endpoint: http://localhost:5000/api/test")
     print("=" * 60)
+    flight_tracker = start_flight_tracker()
     
     app.run(debug=True, host="0.0.0.0", port=5000)

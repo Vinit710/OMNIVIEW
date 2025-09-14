@@ -1,83 +1,56 @@
 function check_backend() {
   fetch("http://127.0.0.1:5000/api/status")
-    .then((res) => res.json())
-    .then((data) => {
-      document.getElementById("status").innerText = data.status;
+    .then((t) => t.json())
+    .then((t) => {
+      document.getElementById("status").innerText = t.status;
     })
-    .catch((err) => {
-      document.getElementById("status").innerText = "Backend not responding.";
-      console.error(err);
+    .catch((t) => {
+      ((document.getElementById("status").innerText =
+        "Backend not responding."),
+        console.error(t));
     });
 }
-
-// Screen switching functionality
 document.addEventListener("DOMContentLoaded", function () {
-  const sidebarTitle = document.getElementById("sidebarTitle");
-  const screenDropdown = document.getElementById("screenDropdown");
-  const dropdownArrow = document.querySelector(".dropdown-arrow");
-  const dropdownItems = document.querySelectorAll(".dropdown-item");
-  const titleContainer = document.querySelector(".sidebar-title-container");
-
-  // Toggle dropdown
-  titleContainer.addEventListener("click", function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-    screenDropdown.classList.toggle("show");
-    dropdownArrow.classList.toggle("rotated");
-  });
-
-  // Close dropdown when clicking outside
-  window.addEventListener("click", function (e) {
-    if (!titleContainer.contains(e.target)) {
-      screenDropdown.classList.remove("show");
-      dropdownArrow.classList.remove("rotated");
-    }
-  });
-
-  // Prevent dropdown from closing when clicking inside
-  screenDropdown.addEventListener("click", function (e) {
-    e.stopPropagation();
-  });
-
-  // Handle screen selection
-  dropdownItems.forEach((item) => {
-    item.addEventListener("click", function (e) {
-      e.stopPropagation();
-
-      // Get selected screen
-      const selectedScreen = this.getAttribute("data-screen");
-      const screenName = this.querySelector("span").textContent;
-
-      // Update active states
-      dropdownItems.forEach((i) => i.classList.remove("active"));
-      this.classList.add("active");
-
-      // Update sidebar title
-      sidebarTitle.textContent = screenName;
-
-      // Close dropdown
-      screenDropdown.classList.remove("show");
-      dropdownArrow.classList.remove("rotated");
-
-      // Switch screens
-      switchToScreen(selectedScreen);
-    });
-  });
-
-  function switchToScreen(screenType) {
-    switch (screenType) {
-      case "monitoring":
-        // Already on monitoring screen
-        console.log("Switched to Monitoring");
-        break;
-      case "disaster":
-        // Navigate to news dashboard
-        window.location.href = "../disaster/disaster.html";
-        break;
-      case "analytics":
-        // Navigate to analytics (you can create this later)
-        console.log("Analytics screen not implemented yet");
-        break;
-    }
-  }
+  const t = document.getElementById("sidebarTitle"),
+    e = document.getElementById("screenDropdown"),
+    n = document.querySelector(".dropdown-arrow"),
+    o = document.querySelectorAll(".dropdown-item"),
+    s = document.querySelector(".sidebar-title-container");
+  (s.addEventListener("click", function (t) {
+    (t.preventDefault(),
+      t.stopPropagation(),
+      e.classList.toggle("show"),
+      n.classList.toggle("rotated"));
+  }),
+    window.addEventListener("click", function (t) {
+      s.contains(t.target) ||
+        (e.classList.remove("show"), n.classList.remove("rotated"));
+    }),
+    e.addEventListener("click", function (t) {
+      t.stopPropagation();
+    }),
+    o.forEach((s) => {
+      s.addEventListener("click", function (s) {
+        s.stopPropagation();
+        const c = this.getAttribute("data-screen"),
+          i = this.querySelector("span").textContent;
+        (o.forEach((t) => t.classList.remove("active")),
+          this.classList.add("active"),
+          (t.textContent = i),
+          e.classList.remove("show"),
+          n.classList.remove("rotated"),
+          (function (t) {
+            switch (t) {
+              case "monitoring":
+                console.log("Switched to Monitoring");
+                break;
+              case "disaster":
+                window.location.href = "../disaster/disaster.html";
+                break;
+              case "analytics":
+                console.log("Analytics screen not implemented yet");
+            }
+          })(c));
+      });
+    }));
 });

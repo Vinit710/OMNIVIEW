@@ -484,3 +484,48 @@ body {
   background: #00a8e8;
   color: white;
 }
+
+/* New Area Control Styles */
+.area-control {
+  position: fixed;
+  bottom: 120px;  /* Position above the bottom panel */
+  left: 300px;    /* Position to the right of the sidebar */
+  background: #222;
+  color: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  z-index: 1000;
+}
+
+.area-control input {
+  background: #333;
+  color: white;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 5px;
+  margin: 5px 0;
+}
+
+.area-control button {
+  background: #00a8e8;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  margin: 5px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.area-control button:hover {
+  background: #0086ba;
+}
+
+#cancelAreaBtn {
+  background: #666;
+}
+
+#cancelAreaBtn:hover {
+  background: #555;
+}

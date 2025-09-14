@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OmniView</title>
     <link rel="stylesheet" href="disaster.css" />
+    <!-- in <head> -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""
+/>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
   </head>
   <body>
     <!-- Main Container -->
@@ -68,42 +80,46 @@
           </div>
         </div>
 
-        <!-- Content Area -->
         <div class="content-area">
-          <!-- Default Content -->
-          <div class="default-content" id="defaultContent">
-            <h2>Welcome to News Dashboard</h2>
-            <p>
-              Stay updated with the latest news, disaster reports, and emergency
-              alerts. Select a category from the sidebar or use the search
-              function to find specific information.
-            </p>
+  <!-- Default Content -->
+  <div class="default-content" id="defaultContent">
+    <h2>Welcome to Disaster Dashboard</h2>
+    <p>
+      Stay updated with the latest disaster reports and emergency
+      alerts. Use the sidebar to navigate.
+    </p>
+  </div>
 
-            <div class="content-cards">
-              <div class="content-card">
-                <div class="card-icon">📰</div>
-                <h3>Latest News</h3>
-                <p>
-                  Access breaking news and current events from reliable sources
-                  worldwide.
-                </p>
-              </div>
-            </div>
-          </div>
+  <!-- News Results -->
+  <div class="news-results" id="newsResults">
+    <div class="section-title" id="sectionTitle">Latest News</div>
+    <div id="resultsContainer"></div>
+  </div>
 
-          <!-- News Results -->
-          <div class="news-results" id="newsResults">
-            <div class="section-title" id="sectionTitle">Latest News</div>
-            <div id="resultsContainer"></div>
-          </div>
+  <!-- Post Disaster Section (MAP here) -->
+  <div class="post-disaster-section" id="postDisasterSection" style="display: none;">
+  <div class="section-title" style="display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
+    <select id="countryFilter" style="padding:6px 12px; border-radius:6px; background:#222; color:#fff; border:1px solid #444;">
+      <option value="">All Countries</option>
+      <!-- Countries will be populated dynamically -->
+    </select>
+    <select id="yearFilter" style="padding:6px 12px; border-radius:6px; background:#222; color:#fff; border:1px solid #444;">
+      <option value="">All Years</option>
+      <!-- Years will be populated dynamically -->
+    </select>
+  </div>
+  <div id="map"></div>
+</div>
 
-          <!-- Report Section -->
-          <div class="report-section" id="reportSection" style="display: none;">
-            <div class="section-title">Disaster Report</div>
-            <div id="reportContainer"></div>
-            <button class="download-btn" id="downloadReportBtn">Download Report</button>
-          </div>
-        </div>
+  <!-- Report Section -->
+  <div class="report-section" id="reportSection" style="display: none;">
+    <div class="section-title">Disaster Report</div>
+    <div id="reportContainer"></div>
+    <button class="download-btn" id="downloadReportBtn">
+      Download Report
+    </button>
+  </div>
+</div>
 
         <!-- Bottom Panel -->
         <div class="bottom-panel">

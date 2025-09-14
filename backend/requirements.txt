@@ -1,8 +1,14 @@
 flask
 flask-cors
-opencv-python
-scikit-learn
-numpy
+requests
+gradio-client
+pandas
 pillow
-
-pip install flask flask-cors requests google-generativeai python-dotenv matplotlib seaborn pandas numpy pillow
+tweepy
+praw
+exifread
+spacy
+tqdm
+transformers
+geopy
+feedparser

@@ -10,6 +10,7 @@
     />
     <link rel="stylesheet" href="monitoring.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js"></script>
   </head>
   <body>
     <!-- Main Container -->
@@ -140,10 +141,23 @@
         maxBoundsViscosity: 1.0,
       });
 
+      // === Feature Layers ===
+      const featureLayers = {
+        buildings: L.layerGroup().addTo(map),
+        roads: L.layerGroup().addTo(map),
+        water: L.layerGroup().addTo(map),
+        ships: L.layerGroup().addTo(map),
+        aircraft: L.layerGroup().addTo(map),
+      };
+
+      // Track active features
+      let activeFeature = "buildings";
+      let areaSelectMode = false;
+      let areaRectangle = null;
+      let selectedBounds = null;
+
       // === Markers ===
-      const cities = [
-        { name: "Pune", coords: [18.5204, 73.8567] },
-      ];
+      const cities = [{ name: "Pune", coords: [18.5204, 73.8567] }];
       cities.forEach((city) => {
         L.marker(city.coords).addTo(map).bindPopup(city.name);
       });
@@ -155,12 +169,66 @@
       });
 
       // Sidebar interactions
-      document.querySelectorAll(".monitoring-item").forEach((item) => {
+      document.querySelectorAll(".monitoring-item").forEach((item, index) => {
         item.addEventListener("click", function () {
+          // Remove active class from all items
           document
             .querySelectorAll(".monitoring-item")
             .forEach((i) => i.classList.remove("active"));
           this.classList.add("active");
+
+          // Clear all layers and stop any running processes
+          Object.values(featureLayers).forEach((layer) => layer.clearLayers());
+          if (updateFlightsInterval) {
+            clearInterval(updateFlightsInterval);
+            updateFlightsInterval = null;
+          }
+
+          // Reset area selection mode
+          areaSelectMode = false;
+          if (areaRectangle) {
+            map.removeLayer(areaRectangle);
+            areaRectangle = null;
+          }
+          map.getContainer().style.cursor = "";
+
+          // Handle specific feature activation
+          switch (index) {
+            case 0: // Buildings
+              activeFeature = "buildings";
+              // Add your buildings feature code here
+              break;
+
+            case 1: // Roads
+              activeFeature = "roads";
+              areaSelectMode = true;
+              map.getContainer().style.cursor = "crosshair";
+              alert(
+                "Click on the map to select the center of a 1km x 1km area for road extraction."
+              );
+              break;
+
+            case 2: // Water Bodies
+              activeFeature = "water";
+              // Add your water bodies feature code here
+              break;
+
+            case 3: // Ships
+              activeFeature = "ships";
+              // Add your ships feature code here
+              break;
+
+            case 4: // Aircraft
+              activeFeature = "aircraft";
+              // Clear any existing interval
+              if (updateFlightsInterval) {
+                clearInterval(updateFlightsInterval);
+              }
+              // Start fresh tracking
+              updateFlights();
+              updateFlightsInterval = setInterval(updateFlights, 30000);
+              break;
+          }
         });
       });
 
@@ -193,12 +261,8 @@
           }
         });
 
-      let areaSelectMode = false;
-      let areaRectangle = null;
-      let selectedBounds = null;
-
-      function getSquareBounds(center, sizeMeters = 1000) {
-        const halfSizeLat = sizeMeters / 2 / 111000;
+      function getSquareBounds(center, sizeMeters = 500) {
+        const halfSizeLat = sizeMeters / 2 / 111000; // Convert meters to degrees (approximately)
         const halfSizeLng =
           sizeMeters / 2 / (111000 * Math.cos((center.lat * Math.PI) / 180));
         return [
@@ -207,103 +271,195 @@
         ];
       }
 
-      
+      document
+        .querySelectorAll(".monitoring-item")[1]
+        .addEventListener("click", () => {
+          // Enable area selection for roads tab
+          areaSelectMode = true;
+          map.getContainer().style.cursor = "crosshair";
+          alert(
+            "Click on the map to select the center of a 1km x 1km area for road extraction."
+          );
+        });
 
-        
-      document.querySelectorAll(".monitoring-item")[1].addEventListener("click", () => {
-  // Enable area selection for roads tab
-  areaSelectMode = true;
-  map.getContainer().style.cursor = "crosshair";
-  alert("Click on the map to select the center of a 1km x 1km area for road extraction.");
-});
+      // Replace the existing map click handler
+      map.on("click", function (e) {
+        if (!areaSelectMode) return;
 
-map.on("click", function (e) {
-  if (!areaSelectMode) return;
+        if (areaRectangle) {
+          featureLayers.roads.removeLayer(areaRectangle);
+          areaRectangle = null;
+        }
 
-  if (areaRectangle) {
-    map.removeLayer(areaRectangle);
-    areaRectangle = null;
-  }
+        // Remove existing control if present
+        const existingControl = document.querySelector('.area-control');
+        if (existingControl) {
+          existingControl.remove();
+        }
 
-  const bounds = getSquareBounds(e.latlng, 1000);
-  selectedBounds = bounds;
-  areaRectangle = L.rectangle(bounds, { color: "#00a8e8", weight: 2 }).addTo(map);
+        // Initial bounds with 500m default
+        const bounds = getSquareBounds(e.latlng, 500);
+        selectedBounds = bounds;
+        areaRectangle = L.rectangle(bounds, {
+          color: "#00a8e8",
+          weight: 2,
+        }).addTo(featureLayers.roads);
 
-  areaRectangle.bindPopup(`
-    <b>Area Selected</b><br>
-    Size: 1km x 1km<br>
-    <button id="extractRoadsBtn">Extract Roads</button>
-    <button id="cancelAreaBtn">Cancel</button>
-  `).openPopup();
+        // Create custom control
+        const controlDiv = document.createElement('div');
+        controlDiv.className = 'area-control';
+        controlDiv.innerHTML = `
+          <b>Area Selected</b><br>
+          <div style="margin-bottom: 10px;">
+            <label for="areaSize">Area Size (meters):</label>
+            <input type="number" id="areaSize" value="500" min="100" max="2000" step="100" style="width: 80px;">
+          </div>
+          <button id="extractRoadsBtn">Extract Roads</button>
+          <button id="cancelAreaBtn">Cancel</button>
+        `;
 
-  setTimeout(() => {
-    // Extract Roads button handler
-    const extractBtn = document.getElementById("extractRoadsBtn");
-    if (extractBtn) {
-      extractBtn.onclick = async () => {
-        console.log("Extract Roads button clicked");
-        areaSelectMode = false;
-        map.getContainer().style.cursor = "";
-        map.fitBounds(selectedBounds);
+        // Add control to the map container
+        document.querySelector('.map-container').appendChild(controlDiv);
 
-        setTimeout(async () => {
-          const mapDiv = document.getElementById("map");
-          const canvas = await html2canvas(mapDiv, {
-            useCORS: true,
-            backgroundColor: null
-          });
-          const imageBase64 = canvas.toDataURL("image/png");
-          console.log("Screenshot taken, sending to backend...");
+        // Add size change handler
+        const sizeInput = document.getElementById("areaSize");
+        if (sizeInput) {
+          sizeInput.onchange = () => {
+            const newSize = parseInt(sizeInput.value);
+            if (newSize >= 100 && newSize <= 2000) {
+              const newBounds = getSquareBounds(e.latlng, newSize);
+              selectedBounds = newBounds;
+              areaRectangle.setBounds(newBounds);
+            }
+          };
+        }
 
-          fetch("http://localhost:5000/api/road-detection", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ image_base64: imageBase64 })
-})
-  .then(async (res) => {
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.error("Backend returned error:", res.status, body);
-      areaRectangle.bindPopup(`<b>Error</b><br>${body.error || 'Server error'}`).openPopup();
-      return;
-    }
-    // success
-    console.log("Backend data:", body);
-    const probMask = body.probability_mask;
-    //const binUrl = body.binary_mask_url;
+        // Extract Roads button handler
+        const extractBtn = document.getElementById("extractRoadsBtn");
+        if (extractBtn) {
+          extractBtn.onclick = async () => {
+            areaSelectMode = false;
+            map.getContainer().style.cursor = "";
+            map.fitBounds(selectedBounds);
 
-    if (!probMask) {
-      console.error("Missing URLs in response:", body);
-      areaRectangle.bindPopup("<b>Error</b><br>Invalid response from backend.").openPopup();
-      return;
-    }
+            // Remove the control before taking screenshot
+            controlDiv.style.display = 'none';
 
-    areaRectangle.bindPopup(`
-      <b>Road Detection Result</b><br>
-      <div><strong>Probability mask</strong><br><img src="${probMask}" style="width:100%;max-width:300px;"></div>
-      
-    `).openPopup();
-  })
-  .catch((err) => {
-    console.error("Network or other error:", err);
-    areaRectangle.bindPopup("Error extracting roads (network/server).").openPopup();
-            });
-        }, 1000);
-      };
-    }
+            setTimeout(async () => {
+              const mapDiv = document.getElementById("map");
+              const canvas = await html2canvas(mapDiv, {
+                useCORS: true,
+                backgroundColor: null,
+              });
 
-    // Cancel button handler
-    const cancelBtn = document.getElementById("cancelAreaBtn");
-    if (cancelBtn) {
-      cancelBtn.onclick = () => {
-        map.removeLayer(areaRectangle);
-        areaRectangle = null;
-        areaSelectMode = false;
-        map.getContainer().style.cursor = "";
-      };
-    }
-  }, 150);
-});
+              // Get pixel coordinates for bounds
+              const nw = map.latLngToContainerPoint(selectedBounds[0]);
+              const se = map.latLngToContainerPoint(selectedBounds[1]);
+
+              // Calculate crop dimensions
+              const x = Math.min(nw.x, se.x);
+              const y = Math.min(nw.y, se.y);
+              const width = Math.abs(se.x - nw.x);
+              const height = Math.abs(se.y - nw.y);
+
+              // Crop the canvas
+              const croppedCanvas = document.createElement("canvas");
+              croppedCanvas.width = width;
+              croppedCanvas.height = height;
+              const ctx = croppedCanvas.getContext("2d");
+              ctx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
+
+              const imageBase64 = croppedCanvas.toDataURL("image/png");
+
+              // Show preview of cropped area
+              areaRectangle
+                .bindPopup(
+                  `<b>Processing Area</b><br>
+          <div>
+            <strong>Selected Area Image:</strong><br>
+            <img src="${imageBase64}" style="width:100%;max-width:300px;"><br>
+            <div style="text-align:center">Processing...</div>
+          </div>`
+                )
+                .openPopup();
+
+              fetch("http://localhost:5000/api/road-detection", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image_base64: imageBase64 }),
+              })
+                .then(async (res) => {
+                  const body = await res.json().catch(() => ({}));
+                  if (!res.ok) {
+                    areaRectangle
+                      .bindPopup(`<b>Error</b><br>${body.error || "Server error"}`)
+                      .openPopup();
+                    return;
+                  }
+                  const probMask = body.probability_mask;
+                  areaRectangle
+                    .bindPopup(
+                      `<b>Road Detection Result</b><br>
+              <div>
+                <strong>Input Image:</strong><br>
+                <img src="${imageBase64}" style="width:100%;max-width:300px;"><br>
+                <strong>Road Mask:</strong><br>
+                <img src="${probMask}" style="width:100%;max-width:300px;"><br>
+                <button id="downloadInputBtn">Download Input</button>
+                <button id="downloadMaskBtn">Download Mask</button>
+              </div>`
+                    )
+                    .openPopup();
+
+                  setTimeout(() => {
+                    // Download Input Image
+                    const downloadInputBtn = document.getElementById("downloadInputBtn");
+                    if (downloadInputBtn) {
+                      downloadInputBtn.onclick = () => {
+                        const link = document.createElement("a");
+                        link.href = imageBase64;
+                        link.download = "road_input.png";
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      };
+                    }
+
+                    // Download Mask Image
+                    const downloadMaskBtn = document.getElementById("downloadMaskBtn");
+                    if (downloadMaskBtn) {
+                      downloadMaskBtn.onclick = () => {
+                        const link = document.createElement("a");
+                        link.href = probMask;
+                        link.download = "road_mask.png";
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      };
+                    }
+                  }, 150);
+                })
+                .catch((err) => {
+                  areaRectangle
+                    .bindPopup("Error extracting roads (network/server).")
+                    .openPopup();
+                });
+            }, 1000);
+          };
+        }
+
+        // Cancel button handler
+        const cancelBtn = document.getElementById("cancelAreaBtn");
+        if (cancelBtn) {
+          cancelBtn.onclick = () => {
+            map.removeLayer(areaRectangle);
+            areaRectangle = null;
+            areaSelectMode = false;
+            map.getContainer().style.cursor = "";
+            controlDiv.remove();
+          };
+        }
+      });
 
       // Layer Switch Button Handlers
       document.getElementById("defaultLayerBtn").onclick = function () {
@@ -327,6 +483,94 @@ map.on("click", function (e) {
         this.classList.add("active");
         document.getElementById("defaultLayerBtn").classList.remove("active");
       };
+
+      // === Aircraft plotting ===
+      // let aircraftLayer = L.layerGroup().addTo(map);
+      let updateFlightsInterval;
+
+      // Create plane icon once
+      const planeIcon = L.icon({
+        iconUrl: "../../../assets/airplane.png",
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16],
+      });
+
+      async function updateFlights() {
+        try {
+          const res = await fetch("http://localhost:5000/api/flights");
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+          const data = await res.json();
+
+          // Only update if we're on the aircraft tab
+          if (activeFeature === "aircraft") {
+            featureLayers.aircraft.clearLayers(); // Clear the correct layer
+
+            if (!data.states || !Array.isArray(data.states)) {
+              console.warn("No flight data available or invalid format");
+              return;
+            }
+
+            const maxPlanes = 1000;
+            const planes = data.states.slice(0, maxPlanes);
+
+            function createRotatedPlaneIcon(heading) {
+              const iconHtml = `
+          <div style="
+            width: 32px; 
+            height: 32px; 
+            transform: rotate(${heading}deg);
+            transform-origin: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <img src="../../../assets/airplane.png" style="width: 32px; height: 32px;" alt="plane" />
+          </div>
+        `;
+
+              return L.divIcon({
+                html: iconHtml,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16],
+                popupAnchor: [0, -16],
+                className: "custom-plane-icon",
+              });
+            }
+
+            planes.forEach((state) => {
+              const lat = state[6];
+              const lon = state[5];
+              const callsign = state[1]?.trim() || "Unknown";
+              const altitude = Math.round((state[7] || 0) * 3.28084);
+              const velocity = Math.round((state[9] || 0) * 2.236936);
+              const heading = state[10];
+
+              if (lat && lon && !isNaN(lat) && !isNaN(lon)) {
+                if (heading !== null && !isNaN(heading)) {
+                  const rotatedIcon = createRotatedPlaneIcon(heading);
+                  const marker = L.marker([lat, lon], { icon: rotatedIcon });
+
+                  marker.bindPopup(`
+              <b>Flight: ${callsign}</b><br>
+              Altitude: ${altitude} ft<br>
+              lat: ${lat.toFixed(4)}°, lon: ${lon.toFixed(4)}°<br>
+              Speed: ${velocity} mph<br>
+              Heading: ${heading}°
+            `);
+
+                  marker.addTo(featureLayers.aircraft); // Add to the correct layer
+                }
+              }
+            });
+
+            console.log(`Updated ${planes.length} aircraft positions`);
+          }
+        } catch (err) {
+          console.error("Failed to fetch aircraft data:", err);
+        }
+      }
     </script>
   </body>
 </html>
