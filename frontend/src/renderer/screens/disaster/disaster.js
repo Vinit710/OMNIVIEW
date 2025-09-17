@@ -20,6 +20,16 @@ const menuItems = document.querySelectorAll(".menu-item"),
   reportContainer = document.getElementById("reportContainer"),
   downloadReportBtn = document.getElementById("downloadReportBtn"),
   logsContent = document.querySelector(".logs-content");
+const disasterIcons = {
+  flood: "🌊",
+  earthquake: "🌋",
+  cyclone: "🌀",
+  drought: "☀️",
+  landslide: "⛰️",
+  tsunami: "🌊",
+  wildfire: "🔥",
+  default: "⚠️",
+}; // Add this after your existing variable declarations
 function updateSectionTitle() {
   sectionTitle.textContent =
     {
@@ -200,20 +210,29 @@ function filterAndRenderMarkers() {
     t && (n = n.filter((e) => String(e.year) === t)),
     renderDisasterMarkers(n));
 }
-function renderDisasterMarkers(e) {
+function renderDisasterMarkers(points) {
   markersLayer.clearLayers();
-  const t = [];
-  (e.forEach((e) => {
-    e.latitude &&
-      e.longitude &&
-      (t.push([e.latitude, e.longitude]),
-      L.marker([e.latitude, e.longitude], { title: e.location })
-        .addTo(markersLayer)
-        .bindPopup(
-          `<b>${e.disastertype || "Disaster"}</b><br>\n         <b>Year:</b> ${e.year || "N/A"}<br>\n         <b>Location:</b> ${e.location || "N/A"}<br>\n         <b>Country:</b> ${e.country || "N/A"}`
-        ));
-  }),
-    t.length && map.fitBounds(t));
+  const latlngs = [];
+  
+  points.forEach((pt) => {
+    if (pt.latitude && pt.longitude) {
+      latlngs.push([pt.latitude, pt.longitude]);
+      
+      const marker = L.marker([pt.latitude, pt.longitude], {
+        icon: createDisasterIcon(pt.disastertype),
+        title: pt.location
+      })
+      .addTo(markersLayer)
+      .bindPopup(
+        `<b>${pt.disastertype || "Disaster"}</b><br>
+         <b>Year:</b> ${pt.year || "N/A"}<br>
+         <b>Location:</b> ${pt.location || "N/A"}<br>
+         <b>Country:</b> ${pt.country || "N/A"}`
+      );
+    }
+  });
+  
+  if (latlngs.length) map.fitBounds(latlngs);
 }
 function populateCountryFilter(e) {
   const t = new Set(e.map((e) => e.country).filter(Boolean)),
@@ -237,6 +256,15 @@ function populateYearFilter(e) {
         ((t.value = e), (t.textContent = e), n.appendChild(t));
       }));
 }
+function createDisasterIcon(type) {
+  const icon = disasterIcons[type.toLowerCase()] || disasterIcons.default;
+  return L.divIcon({
+    html: `<span style="font-size: 24px;">${icon}</span>`,
+    className: "disaster-marker",
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  });
+} // Create custom divIcon for emojis
 (menuItems.forEach((e) => {
   e.addEventListener("click", function () {
     (menuItems.forEach((e) => e.classList.remove("active")),
@@ -312,7 +340,8 @@ function populateYearFilter(e) {
                   console.log("Already on Disaster Analysis screen");
                   break;
                 case "analytics":
-                  console.log("Analytics screen not implemented yet");
+                  window.location.href = "../analysis/analysis.html";
+                  break;
               }
             })(s));
         });
@@ -325,4 +354,46 @@ function populateYearFilter(e) {
     "300px" === e.style.height
       ? ((e.style.height = "120px"), (this.textContent = "Expand ▲"))
       : ((e.style.height = "300px"), (this.textContent = "Collapse ▼"));
-  }));
+  }),
+  document.getElementById('generateAnalysisBtn').addEventListener('click', async function() {
+  const analysisResult = document.getElementById('analysisResult');
+  const analysisContent = document.getElementById('analysisContent');
+  
+  // Get currently displayed disasters
+  const currentDisasters = [];
+  markersLayer.eachLayer(marker => {
+    const position = marker.getLatLng();
+    const popup = marker.getPopup();
+    currentDisasters.push({
+      latitude: position.lat,
+      longitude: position.lng,
+      details: popup.getContent()
+    });
+  });
+
+  analysisContent.innerHTML = '<div class="loading">Generating analysis...</div>';
+  analysisResult.style.display = 'block';
+
+  try {
+    const response = await fetch('http://localhost:5000/api/analyze-disasters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        disasters: currentDisasters,
+        country: document.getElementById('countryFilter').value,
+        year: document.getElementById('yearFilter').value
+      })
+    });
+
+    const data = await response.json();
+    analysisContent.innerHTML = `
+      <div class="analysis-content">
+        ${markdownToHtml(data.analysis)}
+      </div>
+    `;
+    addLog('info', 'Generated disaster analysis report');
+  } catch (error) {
+    analysisContent.innerHTML = '<div class="error">Failed to generate analysis</div>';
+    addLog('error', 'Failed to generate analysis: ' + error.message);
+  }
+}));

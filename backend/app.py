@@ -1079,6 +1079,43 @@ def disaster_csv():
     data = df[["id", "country", "location", "disastertype", "year", "latitude", "longitude"]].to_dict(orient="records")
     return jsonify(data)
 
+@app.route('/api/analyze-disasters', methods=['POST'])
+def analyze_disasters():
+    try:
+        data = request.json or {}
+        disasters = data.get('disasters', [])
+        country = data.get('country', 'All Countries')
+        year = data.get('year', 'All Years')
+
+        # ✅ Build prompt
+        prompt = f"""
+        Analyze the following disaster data for {country} in {year}:
+
+        Number of disasters: {len(disasters)}
+        Types of disasters present in the data: {list(set(d.get('disastertype', 'Unknown') for d in disasters))}
+        Geographical distribution (lat/long): {[{'lat': d.get('latitude'), 'lng': d.get('longitude')} for d in disasters]}
+
+        Provide insights and recommendations in Markdown format with sections:
+        - Overview
+        - Disaster Types
+        - Geographic Distribution
+        - Key Observations
+        - Recommendations
+        """
+
+        # ✅ Use your agent to query LLMs
+        agent = DisasterResponseAgent()
+        analysis_text = agent.query_free_llm_api(prompt)
+
+        if not analysis_text or len(analysis_text.strip()) == 0:
+            analysis_text = "No analysis generated. Please try again."
+
+        return jsonify({'analysis': analysis_text})
+
+    except Exception as e:
+        app.logger.error(f"Disaster analysis failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == "__main__":
     print("🚀 STARTING AI DISASTER RESPONSE SYSTEM...")

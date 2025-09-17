@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OmniView - Analytics</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <link rel="stylesheet" href="analysis.css" />
+  </head>
+  <body>
+    <div class="main-container">
+      <div class="sidebar">
+        <!-- Sidebar content unchanged -->
+        <div class="sidebar-header">
+          <div class="sidebar-title-container">
+            <div class="sidebar-title active-screen" id="sidebarTitle">ANALYTICS</div>
+            <div class="dropdown-arrow">▼</div>
+          </div>
+          <div class="screen-dropdown" id="screenDropdown">
+            <div class="dropdown-item" data-screen="monitoring">
+              <div class="dropdown-icon">📊</div>
+              <span>MONITORING</span>
+            </div>
+            <div class="dropdown-item" data-screen="disaster">
+              <div class="dropdown-icon">⚠️</div>
+              <span>DISASTER</span>
+            </div>
+            <div class="dropdown-item active" data-screen="analytics">
+              <div class="dropdown-icon">📈</div>
+              <span>ANALYTICS</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-container">
+        <div class="content-area">
+          <div class="default-content" id="defaultContent">
+            <h2>Analytics Dashboard</h2>
+            <p>Welcome to the Analytics section. Visualize disaster patterns, land classifications, NDVI trends, and more with AI-simulated tools.</p>
+          </div>
+
+          <div id="analyticsContainer">
+            <div class="filters">
+              <label>Filter by Year: <select id="yearFilter"><option value="">All</option></select></label>
+              <label>Disaster Type: <select id="typeFilter"><option value="">All</option><option value="Flood">Flood</option><option value="Fire">Fire</option><option value="Earthquake">Earthquake</option></select></label>
+            </div>
+            <div class="analytics-grid">
+              <div class="map-card">
+                <h3>🌍 Earth Observation Map</h3>
+                <div id="map" style="height: 400px;"></div>
+                <button id="analyzeBtn" class="action-btn">Analyze Selected Area</button>
+                <button id="ndviBtn" class="action-btn">Compute NDVI</button>
+              </div>
+
+              <div class="charts-card">
+                <h3>📈 Disaster Trends</h3>
+                <input type="range" id="timeSlider" min="2019" max="2025" value="2025" style="width: 100%;">
+                <canvas id="trendChart"></canvas>
+                <button id="exportTrend" class="action-btn small">Export Chart</button>
+              </div>
+
+              <div class="charts-card">
+                <h3>🗺️ Land Classification</h3>
+                <canvas id="classificationChart"></canvas>
+              </div>
+
+              <div class="charts-card">
+                <h3>⚠️ Disaster Types</h3>
+                <canvas id="disasterBarChart"></canvas>
+                <button id="exportBar" class="action-btn small">Export Chart</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom-panel">
+          <div class="panel-header">
+            <div class="panel-title">Logs</div>
+            <button class="expand-btn">Expand ▲</button>
+          </div>
+          <div class="logs-content">
+            <div class="log-info">Info: Analytics screen loaded successfully</div>
+          </div>
+        </div>
+
+        <!-- Modal for Details -->
+        <div id="analysisModal" class="modal">
+          <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Analysis Details</h3>
+            <p id="modalDetails"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script> <!-- For export -->
+    <script src="analysis.js"></script>
+  </body>
+</html>

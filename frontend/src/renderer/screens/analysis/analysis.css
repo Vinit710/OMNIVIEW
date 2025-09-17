@@ -1,0 +1,271 @@
+/* General Layout */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(to bottom, #111, #222); /* Futuristic gradient */
+  color: #eee;
+  display: flex;
+  height: 100vh;
+}
+
+/* Main container */
+.main-container {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 220px;
+  background: #1c1c1c;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5); /* Added shadow for depth */
+}
+
+.sidebar-header {
+  margin-bottom: 20px;
+}
+
+.sidebar-title-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #222;
+  padding: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease; /* Animation */
+}
+
+.sidebar-title-container:hover {
+  background: #333;
+}
+
+.sidebar-title {
+  font-weight: bold;
+  color: #fff;
+}
+
+.active-screen {
+  color: #00c4ff;
+}
+
+.dropdown-arrow {
+  font-size: 14px;
+}
+
+.screen-dropdown {
+  margin-top: 10px;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin: 6px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #ccc;
+  transition: transform 0.2s ease, background 0.3s ease; /* Hover animation */
+}
+.logs-content {
+  margin-top: 10px;
+  font-size: 14px;
+  max-height: 200px; /* default visible */
+  overflow-y: auto;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+.logs-hidden {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.dropdown-item:hover {
+  background: #333;
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.dropdown-item.active {
+  background: #00c4ff22;
+  color: #00c4ff;
+}
+
+/* Content Area */
+.content-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #181818;
+}
+
+.content-area {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.default-content h2 {
+  margin-top: 0;
+  color: #00c4ff;
+  text-shadow: 0 0 5px #00c4ff; /* Glow effect */
+}
+
+.default-content p {
+  color: #aaa;
+  font-size: 15px;
+}
+
+/* Analytics Container */
+#analyticsContainer {
+  background: #222;
+  padding: 20px;
+  border-radius: 10px;
+  margin-top: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.map-card, .charts-card {
+  background: #1c1c1c;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 196, 255, 0.2); /* AI-blue glow */
+  animation: fadeIn 1s ease-in-out; /* Fade-in animation */
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#analyticsContainer h3 {
+  margin: 0 0 10px;
+  color: #ff9800;
+}
+
+.action-btn {
+  background: #00c4ff;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: background 0.3s ease;
+}
+
+.action-btn:hover {
+  background: #009acd;
+}
+
+/* Bottom Panel */
+.bottom-panel {
+  background: #111;
+  border-top: 1px solid #333;
+  padding: 10px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-title {
+  font-weight: bold;
+  color: #ccc;
+}
+
+.expand-btn {
+  background: #222;
+  border: 1px solid #444;
+  color: #ccc;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.expand-btn:hover {
+  background: #333;
+}
+
+.logs-content {
+  margin-top: 10px;
+  font-size: 14px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.log-info {
+  color: #4caf50;
+}
+
+.log-warning {
+  color: #ffc107;
+}
+
+.log-error {
+  color: #f44336;
+}
+
+.filters {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.filters label {
+  color: #ccc;
+}
+
+.action-btn.small {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.4);
+  animation: fadeIn 0.5s;
+}
+
+.modal-content {
+  background-color: #222;
+  margin: 15% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%;
+  max-width: 600px;
+  border-radius: 10px;
+}
+
+.close {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: #fff;
+}

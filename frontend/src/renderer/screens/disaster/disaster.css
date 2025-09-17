@@ -39,6 +39,19 @@ body {
   margin-bottom: 8px;
   letter-spacing: 0.5px;
 }
+.logs-content {
+  margin-top: 10px;
+  font-size: 14px;
+  max-height: 200px; /* default visible */
+  overflow-y: auto;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+.logs-hidden {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
 
 .menu-section {
   flex: 1;
@@ -500,4 +513,39 @@ body {
   background: #222;
   border-radius: 8px;
   margin-bottom: 20px;
+}
+
+.analysis-section {
+  margin-top: 20px;
+  padding: 15px;
+  background: #222;
+  border-radius: 8px;
+}
+
+.analysis-btn {
+  background: #00a8e8;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.analysis-btn:hover {
+  background: #0086ba;
+}
+
+.analysis-result {
+  margin-top: 15px;
+  padding: 15px;
+  background: #333;
+  border-radius: 4px;
+  color: white;
+}
+
+.disaster-marker {
+  background: none;
+  border: none;
 }

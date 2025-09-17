@@ -96,19 +96,47 @@
     <div id="resultsContainer"></div>
   </div>
 
-  <!-- Post Disaster Section (MAP here) -->
-  <div class="post-disaster-section" id="postDisasterSection" style="display: none;">
-  <div class="section-title" style="display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
-    <select id="countryFilter" style="padding:6px 12px; border-radius:6px; background:#222; color:#fff; border:1px solid #444;">
-      <option value="">All Countries</option>
-      <!-- Countries will be populated dynamically -->
-    </select>
-    <select id="yearFilter" style="padding:6px 12px; border-radius:6px; background:#222; color:#fff; border:1px solid #444;">
-      <option value="">All Years</option>
-      <!-- Years will be populated dynamically -->
-    </select>
+<!-- Post Disaster Section (MAP here) -->
+<div class="post-disaster-section" id="postDisasterSection" style="display: none;">
+  
+  <!-- Filters + Generate Button -->
+  <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+    <div>
+      <select id="countryFilter" style="padding:6px 12px; border-radius:6px; background:#222; color:#fff; border:1px solid #444;">
+        <option value="">All Countries</option>
+        <!-- Countries populated dynamically -->
+      </select>
+      <select id="yearFilter" style="padding:6px 12px; border-radius:6px; background:#222; color:#fff; border:1px solid #444;">
+        <option value="">All Years</option>
+        <!-- Years populated dynamically -->
+      </select>
+    </div>
+    <button id="generateAnalysisBtn" class="analysis-btn" style="padding:6px 12px; border-radius:6px; background:#007bff; color:#fff; border:none; cursor:pointer;">
+      Generate Analysis
+    </button>
   </div>
-  <div id="map"></div>
+
+  <!-- Map -->
+  <div id="map" style="position: relative;"></div>
+
+  <!-- Legend -->
+  <div class="disaster-legend" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:10px; font-size:14px;">
+    <div>🌊 Flood</div>
+    <div>🌋 Earthquake</div>
+    <div>🌀 Cyclone</div>
+    <div>☀️ Drought</div>
+    <div>⛰️ Landslide</div>
+    <div>🔥 Wildfire</div>
+    <div>⚠️ Other</div>
+  </div>
+
+  <!-- Analysis Result -->
+  <div class="analysis-section">
+    <div id="analysisResult" class="analysis-result" style="display: none;">
+      <h3>Disaster Analysis Report</h3>
+      <div id="analysisContent"></div>
+    </div>
+  </div>
 </div>
 
   <!-- Report Section -->
@@ -121,24 +149,19 @@
   </div>
 </div>
 
-        <!-- Bottom Panel -->
-        <div class="bottom-panel">
-          <div class="panel-header">
-            <div class="panel-title">Logs</div>
-            <button class="expand-btn">Expand ▲</button>
-          </div>
-          <div class="logs-content">
-            <div class="log-warning">Warning: No news articles found</div>
-            <div class="log-warning">
-              Warning: Unable to fetch latest updates
-            </div>
-            <div class="log-error">
-              Error: Connection to news service failed
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+<!-- Bottom Panel -->
+<div class="bottom-panel" id="bottomPanel">
+  <div class="panel-header">
+    <div class="panel-title">Logs</div>
+    <button class="expand-btn" id="toggleLogsBtn">Hide ▼</button>
+  </div>
+  <div class="logs-content" id="logsContent">
+    <div class="log-warning">Warning: No news articles found</div>
+    <div class="log-warning">Warning: Unable to fetch latest updates</div>
+    <div class="log-error">Error: Connection to news service failed</div>
+  </div>
+</div>
+
 
     <script src="disaster.js"></script>
   </body>

@@ -48,7 +48,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 window.location.href = "../disaster/disaster.html";
                 break;
               case "analytics":
-                console.log("Analytics screen not implemented yet");
+                window.location.href = "../analysis/analysis.html";
+                break;
             }
           })(c));
       });
