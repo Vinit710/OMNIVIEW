@@ -1,7 +1,8 @@
 /* General Layout */
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: linear-gradient(to bottom, #111, #222); /* Futuristic gradient */
   color: #eee;
   display: flex;
@@ -28,6 +29,7 @@ body {
 
 .sidebar-header {
   margin-bottom: 20px;
+  position: relative;
 }
 
 .sidebar-title-container {
@@ -56,10 +58,33 @@ body {
 
 .dropdown-arrow {
   font-size: 14px;
+  transition: transform 0.2s ease-in-out;
+}
+
+.dropdown-arrow.rotated {
+  transform: rotate(180deg);
 }
 
 .screen-dropdown {
-  margin-top: 10px;
+  position: absolute;
+  top: calc(100% - 10px);
+  left: 20px;
+  right: 20px;
+  background: #2d2d2d;
+  border: 1px solid #3d3d3d;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1002;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.2s ease-in-out;
+}
+
+.screen-dropdown.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 .dropdown-item {
@@ -71,14 +96,18 @@ body {
   border-radius: 6px;
   cursor: pointer;
   color: #ccc;
-  transition: transform 0.2s ease, background 0.3s ease; /* Hover animation */
+  transition:
+    transform 0.2s ease,
+    background 0.3s ease; /* Hover animation */
 }
 .logs-content {
   margin-top: 10px;
   font-size: 14px;
   max-height: 200px; /* default visible */
   overflow-y: auto;
-  transition: max-height 0.3s ease, opacity 0.3s ease;
+  transition:
+    max-height 0.3s ease,
+    opacity 0.3s ease;
 }
 
 .logs-hidden {
@@ -138,7 +167,8 @@ body {
   gap: 20px;
 }
 
-.map-card, .charts-card {
+.map-card,
+.charts-card {
   background: #1c1c1c;
   padding: 15px;
   border-radius: 8px;
@@ -147,8 +177,14 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 #analyticsContainer h3 {
@@ -244,7 +280,7 @@ body {
   top: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0,0,0,0.4);
+  background-color: rgba(0, 0, 0, 0.4);
   animation: fadeIn 0.5s;
 }
 
