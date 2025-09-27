@@ -22,8 +22,11 @@ import re
 import time
 from urllib.parse import quote
 import random
+
 from road_backend import road_bp
 from services.flight_data import start_flight_tracker, get_flights_data
+# Import the big roads extraction blueprint
+from road_extract import road_extract_bp
 
 # Load environment variables
 load_dotenv()
@@ -43,13 +46,18 @@ if not GEMINI_API_KEY or not GOOGLE_API_KEY or not GOOGLE_CX:
 # Configure Gemini
 genai.configure(api_key=GEMINI_API_KEY)
 
+
 app = Flask(__name__)
+# Allow up to 1GB uploads for large satellite files
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024
 CORS(app)
 from flask import send_file
 
 
 
+
 app.register_blueprint(road_bp)
+app.register_blueprint(road_extract_bp)
 
 class DisasterResponseAgent:
     def __init__(self):
