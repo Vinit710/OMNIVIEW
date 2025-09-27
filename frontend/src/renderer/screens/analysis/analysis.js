@@ -21,6 +21,30 @@ document.addEventListener("DOMContentLoaded", () => {
   const sidebarTitleContainer = document.querySelector(
     ".sidebar-title-container"
   );
+  // Sub-tabs (menu-section)
+  const menuItems = document.querySelectorAll('.menu-item');
+  const overviewSection = document.getElementById('overviewSection');
+  const trendsSection = document.getElementById('trendsSection');
+  const classificationSection = document.getElementById('classificationSection');
+  const ndviSection = document.getElementById('ndviSection');
+  // Sub-tab switching logic
+  menuItems.forEach((item) => {
+    item.addEventListener('click', function () {
+      menuItems.forEach((el) => el.classList.remove('active'));
+      this.classList.add('active');
+      // Hide all sections
+      overviewSection.style.display = 'none';
+      trendsSection.style.display = 'none';
+      classificationSection.style.display = 'none';
+      ndviSection.style.display = 'none';
+      // Show selected
+      const section = this.getAttribute('data-section');
+      if (section === 'overview') overviewSection.style.display = '';
+      if (section === 'trends') trendsSection.style.display = '';
+      if (section === 'classification') classificationSection.style.display = '';
+      if (section === 'ndvi') ndviSection.style.display = '';
+    });
+  });
 
   // Toggle dropdown
   sidebarTitleContainer.addEventListener("click", function (event) {
@@ -63,8 +87,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Navigate to screen
       switchScreen(screen);
-    });
   });
+});
 
   // Screen switching function
   function switchScreen(screen) {
@@ -83,11 +107,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Mock Data Expansion
   const mockDisasterData = {
-    years: ["2019", "2020", "2021", "2022", "2023", "2024", "2025"],
+    years: ['2019', '2020', '2021', '2022', '2023', '2024', '2025'],
     events: {
       Flood: [5, 7, 4, 6, 8, 5, 9],
       Fire: [3, 4, 6, 5, 7, 8, 6],
-      Earthquake: [2, 3, 1, 4, 2, 3, 5],
+      Earthquake: [2, 3, 1, 4, 2, 3, 5]
     },
     classifications: [
       {
@@ -99,13 +123,13 @@ document.addEventListener("DOMContentLoaded", () => {
         data: [10, 50, 20, 15, 5],
       }, // Rural area
     ],
-    ndviValues: [0.2, 0.4, 0.6, 0.3, 0.5, 0.7, 0.8], // Mock NDVI over time
+    ndviValues: [0.2, 0.4, 0.6, 0.3, 0.5, 0.7, 0.8] // Mock NDVI over time
   };
 
   // Populate Filters
-  const yearFilter = document.getElementById("yearFilter");
-  mockDisasterData.years.forEach((year) => {
-    const option = document.createElement("option");
+  const yearFilter = document.getElementById('yearFilter');
+  mockDisasterData.years.forEach(year => {
+    const option = document.createElement('option');
     option.value = year;
     option.textContent = year;
     yearFilter.appendChild(option);
@@ -125,15 +149,15 @@ document.addEventListener("DOMContentLoaded", () => {
   map.addLayer(drawnItems);
   const drawControl = new L.Control.Draw({
     draw: { rectangle: true },
-    edit: { featureGroup: drawnItems },
+    edit: { featureGroup: drawnItems }
   });
   map.addControl(drawControl);
 
   map.on("draw:created", (e) => {
     drawnItems.addLayer(e.layer);
     addLog("Area selected");
-    map.on("click", (clickEvent) => {
-      L.marker(clickEvent.latlng).addTo(map).bindPopup("Analysis Point");
+    map.on('click', (clickEvent) => {
+      L.marker(clickEvent.latlng).addTo(map).bindPopup('Analysis Point');
       addLog("Marker added at " + clickEvent.latlng);
       updateCharts(); // Trigger chart update on click
     });
@@ -145,86 +169,59 @@ document.addEventListener("DOMContentLoaded", () => {
     if (ndviLayer) map.removeLayer(ndviLayer);
     const bounds = drawnItems.getBounds() || map.getBounds();
     ndviLayer = L.rectangle(bounds, {
-      color: "none",
+      color: 'none',
       fillColor: getNdviColor(Math.random() * 0.8 + 0.2),
-      fillOpacity: 0.5,
+      fillOpacity: 0.5
     }).addTo(map);
     addLog("NDVI overlay added");
   }
 
   function getNdviColor(ndvi) {
-    return ndvi > 0.5 ? "#4caf50" : ndvi > 0.3 ? "#ffeb3b" : "#f44336";
+    return ndvi > 0.5 ? '#4caf50' : ndvi > 0.3 ? '#ffeb3b' : '#f44336';
   }
 
   // Charts
   let trendChart, classificationChart, barChart;
 
-  const trendCtx = document.getElementById("trendChart").getContext("2d");
+  const trendCtx = document.getElementById('trendChart').getContext('2d');
   trendChart = new Chart(trendCtx, {
-    type: "line",
+    type: 'line',
     data: { labels: mockDisasterData.years, datasets: [] },
-    options: { responsive: true, scales: { y: { beginAtZero: true } } },
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
   });
 
-  const classCtx = document
-    .getElementById("classificationChart")
-    .getContext("2d");
+  const classCtx = document.getElementById('classificationChart').getContext('2d');
   classificationChart = new Chart(classCtx, {
-    type: "pie",
-    data: {
-      labels: [],
-      datasets: [
-        {
-          data: [],
-          backgroundColor: [
-            "#ff6384",
-            "#36a2eb",
-            "#ffce56",
-            "#4bc0c0",
-            "#9966ff",
-          ],
-        },
-      ],
-    },
-    options: { responsive: true },
+    type: 'pie',
+    data: { labels: [], datasets: [{ data: [], backgroundColor: ['#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff'] }] },
+    options: { responsive: true }
   });
 
-  const barCtx = document.getElementById("disasterBarChart").getContext("2d");
+  const barCtx = document.getElementById('disasterBarChart').getContext('2d');
   barChart = new Chart(barCtx, {
-    type: "bar",
-    data: {
-      labels: ["Flood", "Fire", "Earthquake"],
-      datasets: [{ label: "Events", data: [], backgroundColor: "#ff9800" }],
-    },
-    options: { responsive: true, scales: { y: { beginAtZero: true } } },
+    type: 'bar',
+    data: { labels: ['Flood', 'Fire', 'Earthquake'], datasets: [{ label: 'Events', data: [], backgroundColor: '#ff9800' }] },
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
   });
 
   // Update Charts Function
-  function updateCharts(year = "", type = "") {
+  function updateCharts(year = '', type = '') {
     const index = mockDisasterData.years.indexOf(year);
-    const datasets = Object.keys(mockDisasterData.events)
-      .map((key) => ({
-        label: key,
-        data: mockDisasterData.events[key],
-        borderColor: getRandomColor(),
-        tension: 0.1,
-      }))
-      .filter((ds) => !type || ds.label === type);
+    const datasets = Object.keys(mockDisasterData.events).map(key => ({
+      label: key,
+      data: mockDisasterData.events[key],
+      borderColor: getRandomColor(),
+      tension: 0.1
+    })).filter(ds => !type || ds.label === type);
     trendChart.data.datasets = datasets;
     trendChart.update();
 
-    const classIndex = Math.floor(
-      Math.random() * mockDisasterData.classifications.length
-    );
-    classificationChart.data.labels =
-      mockDisasterData.classifications[classIndex].labels;
-    classificationChart.data.datasets[0].data =
-      mockDisasterData.classifications[classIndex].data;
+    const classIndex = Math.floor(Math.random() * mockDisasterData.classifications.length);
+    classificationChart.data.labels = mockDisasterData.classifications[classIndex].labels;
+    classificationChart.data.datasets[0].data = mockDisasterData.classifications[classIndex].data;
     classificationChart.update();
 
-    const barData = Object.values(mockDisasterData.events).map(
-      (arr) => arr.reduce((a, b) => a + b, 0) / arr.length
-    ); // Average
+    const barData = Object.values(mockDisasterData.events).map(arr => arr.reduce((a, b) => a + b, 0) / arr.length); // Average
     barChart.data.datasets[0].data = barData;
     barChart.update();
 
@@ -233,65 +230,52 @@ document.addEventListener("DOMContentLoaded", () => {
   updateCharts(); // Initial
 
   function getRandomColor() {
-    return "#" + Math.floor(Math.random() * 16777215).toString(16);
+    return '#' + Math.floor(Math.random()*16777215).toString(16);
   }
 
   // Time Slider
-  const timeSlider = document.getElementById("timeSlider");
-  timeSlider.addEventListener("input", (e) => {
+  const timeSlider = document.getElementById('timeSlider');
+  timeSlider.addEventListener('input', (e) => {
     const year = e.target.value;
     updateCharts(year);
     addLog(`Time slider set to ${year}`);
   });
 
   // Filters
-  yearFilter.addEventListener("change", (e) =>
-    updateCharts(e.target.value, document.getElementById("typeFilter").value)
-  );
-  document
-    .getElementById("typeFilter")
-    .addEventListener("change", (e) =>
-      updateCharts(document.getElementById("yearFilter").value, e.target.value)
-    );
+  yearFilter.addEventListener('change', (e) => updateCharts(e.target.value, document.getElementById('typeFilter').value));
+  document.getElementById('typeFilter').addEventListener('change', (e) => updateCharts(document.getElementById('yearFilter').value, e.target.value));
 
   // Analyze Buttons
-  document.getElementById("analyzeBtn").addEventListener("click", () => {
-    if (drawnItems.getLayers().length === 0)
-      return addLog("No area", "warning");
+  document.getElementById('analyzeBtn').addEventListener('click', () => {
+    if (drawnItems.getLayers().length === 0) return addLog("No area", "warning");
     const mockDetails = `Classification: ${JSON.stringify(mockDisasterData.classifications[0])}`;
     showModal(mockDetails);
     updateCharts();
     addLog("Analysis complete");
   });
 
-  document.getElementById("ndviBtn").addEventListener("click", () => {
-    if (drawnItems.getLayers().length === 0)
-      return addLog("No area", "warning");
-    const mockNdvi =
-      mockDisasterData.ndviValues[
-        Math.floor(Math.random() * mockDisasterData.ndviValues.length)
-      ];
+  document.getElementById('ndviBtn').addEventListener('click', () => {
+    if (drawnItems.getLayers().length === 0) return addLog("No area", "warning");
+    const mockNdvi = mockDisasterData.ndviValues[Math.floor(Math.random() * mockDisasterData.ndviValues.length)];
     addNdviOverlay();
     showModal(`Mock NDVI: ${mockNdvi.toFixed(2)} (Healthy if >0.5)`);
     addLog("NDVI computed");
   });
 
   // Modal
-  const modal = document.getElementById("analysisModal");
-  const closeBtn = document.querySelector(".close");
+  const modal = document.getElementById('analysisModal');
+  const closeBtn = document.querySelector('.close');
   function showModal(details) {
-    document.getElementById("modalDetails").textContent = details;
-    modal.style.display = "block";
+    document.getElementById('modalDetails').textContent = details;
+    modal.style.display = 'block';
   }
-  closeBtn.addEventListener("click", () => (modal.style.display = "none"));
-  window.addEventListener("click", (e) => {
-    if (e.target === modal) modal.style.display = "none";
-  });
+  closeBtn.addEventListener('click', () => modal.style.display = 'none');
+  window.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
 
   // Export
   function exportChart(chartId, filename) {
-    html2canvas(document.getElementById(chartId).parentNode).then((canvas) => {
-      const link = document.createElement("a");
+    html2canvas(document.getElementById(chartId).parentNode).then(canvas => {
+      const link = document.createElement('a');
       link.download = filename;
       link.href = canvas.toDataURL();
       link.click();
