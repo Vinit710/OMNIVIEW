@@ -1,3 +1,22 @@
+/* Make content-container fill all available space next to sidebar */
+.content-container {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+/* Ensure content area uses full available space */
+.content-area {
+  flex: 1 1 0%;
+  padding: 0;
+  overflow-y: auto;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
 /* General Layout */
 body {
   margin: 0;
@@ -18,13 +37,69 @@ body {
 
 /* Sidebar */
 .sidebar {
-  width: 220px;
-  background: #1c1c1c;
+  width: 240px;
+  background: #23272f;
   border-right: 1px solid #333;
   display: flex;
   flex-direction: column;
-  padding: 10px;
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5); /* Added shadow for depth */
+  padding: 0;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+}
+/* Sidebar Menu Buttons */
+.menu-section {
+  flex: 1;
+  padding: 20px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 20px;
+  margin-bottom: 4px;
+}
+
+.sidebar-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #23272f;
+  color: #b0e0ff;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  box-shadow: none;
+  outline: none;
+  text-align: left;
+}
+
+.sidebar-btn:hover {
+  background: #2d3a4a;
+  color: #fff;
+}
+
+.menu-item.active .sidebar-btn {
+  background: #1e3a5f;
+  color: #64b5f6;
+}
+
+.item-icon {
+  width: 22px;
+  height: 22px;
+  background: #2d3a4a;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
 }
 
 .sidebar-header {
@@ -128,53 +203,81 @@ body {
 }
 
 /* Content Area */
-.content-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: #181818;
+.content-card {
+  background: #23272f;
+  border-radius: 10px;
+  padding: 28px 20px 22px 20px;
+  text-align: center;
+  border: 1px solid #2d3a4a;
+  transition: background 0.2s, box-shadow 0.2s;
+  max-width: 320px;
+  margin: 0 auto;
+  box-shadow: 0 2px 12px rgba(0,196,255,0.08);
 }
-
-.content-area {
-  flex: 1;
-  padding: 20px;
-  overflow-y: auto;
+.content-card:hover {
+  background: #283142;
+  box-shadow: 0 4px 18px rgba(0,196,255,0.15);
 }
-
-.default-content h2 {
-  margin-top: 0;
+.content-card .card-icon {
+  font-size: 36px;
+  margin-bottom: 14px;
   color: #00c4ff;
-  text-shadow: 0 0 5px #00c4ff; /* Glow effect */
+  filter: drop-shadow(0 0 6px #00c4ff55);
+}
+.content-card h3 {
+  color: #64b5f6;
+  margin-bottom: 8px;
+  font-size: 1.2rem;
+  letter-spacing: 0.5px;
+}
+.content-card p {
+  color: #b0e0ff;
+  font-size: 15px;
+  margin-bottom: 0;
 }
 
-.default-content p {
-  color: #aaa;
-  font-size: 15px;
-}
 
 /* Analytics Container */
 #analyticsContainer {
   background: #222;
-  padding: 20px;
-  border-radius: 10px;
-  margin-top: 20px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  padding: 0;
+  border-radius: 0;
+  margin-top: 0;
+  box-shadow: none;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
+
 
 .analytics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+
+  gap: 24px;
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
 }
 
+
 .map-card,
-.charts-card {
-  background: #1c1c1c;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 196, 255, 0.2); /* AI-blue glow */
-  animation: fadeIn 1s ease-in-out; /* Fade-in animation */
-}
+    .charts-card {
+    background: #1c1c1c;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 196, 255, 0.2);
+    animation: fadeIn 1s ease-in-out;
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+
 
 @keyframes fadeIn {
   from {

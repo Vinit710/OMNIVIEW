@@ -41,39 +41,18 @@
           </div>
         </div>
         <div class="menu-section">
-          <div class="menu-item active" data-section="overview">
-            <div class="item-icon">📊</div>
-            <span>Overview</span>
-          </div>
-          <div class="menu-item" data-section="trends">
-            <div class="item-icon">📈</div>
-            <span>Trends</span>
-          </div>
-          <div class="menu-item" data-section="classification">
-            <div class="item-icon">🗺️</div>
-            <span>Classification</span>
-          </div>
-          <div class="menu-item" data-section="ndvi">
-            <div class="item-icon">🌱</div>
-            <span>NDVI</span>
+          <div class="menu-item active" data-section="analytics">
+            <button class="sidebar-btn"><span class="item-icon">�</span> Analytics</button>
           </div>
           <div class="menu-item" data-section="bigroads">
-            <div class="item-icon">🛣️</div>
-            <span>Extract Big Roads</span>
+            <button class="sidebar-btn"><span class="item-icon">🛣️</span> Extract Big Roads</button>
           </div>
         </div>
       </div>
 
       <div class="content-container">
         <div class="content-area">
-          <div class="default-content" id="defaultContent">
-            <h2>Analytics Dashboard</h2>
-            <p>
-              Welcome to the Analytics section. Visualize disaster patterns,
-              land classifications, NDVI trends, and more with AI-simulated
-              tools.
-            </p>
-          </div>
+          <!-- Default content removed for better layout -->
 
           <div id="analyticsContainer">
             <div class="filters">
@@ -94,30 +73,24 @@
               </label>
             </div>
             <div class="analytics-grid">
-              <div class="overview-section" id="overviewSection">
-                <div class="map-card">
+              <div id="analyticsFeatures" style="display: flex; flex-wrap: wrap; gap: 24px; width: 100%;">
+                <div class="map-card" style="flex:1 1 350px; min-width:340px; max-width:600px;">
                   <h3>🌍 Earth Observation Map</h3>
                   <div id="map" style="height: 400px"></div>
                   <button id="analyzeBtn" class="action-btn">Analyze Selected Area</button>
                   <button id="ndviBtn" class="action-btn">Compute NDVI</button>
                 </div>
-              </div>
-              <div class="trends-section" id="trendsSection" style="display:none;">
-                <div class="charts-card">
+                <div class="charts-card" style="flex:1 1 350px; min-width:340px; max-width:600px;">
                   <h3>📈 Disaster Trends</h3>
                   <input type="range" id="timeSlider" min="2019" max="2025" value="2025" style="width: 100%" />
                   <canvas id="trendChart"></canvas>
                   <button id="exportTrend" class="action-btn small">Export Chart</button>
                 </div>
-              </div>
-              <div class="classification-section" id="classificationSection" style="display:none;">
-                <div class="charts-card">
+                <div class="charts-card" style="flex:1 1 350px; min-width:340px; max-width:600px;">
                   <h3>🗺️ Land Classification</h3>
                   <canvas id="classificationChart"></canvas>
                 </div>
-              </div>
-              <div class="ndvi-section" id="ndviSection" style="display:none;">
-                <div class="charts-card">
+                <div class="charts-card" style="flex:1 1 350px; min-width:340px; max-width:600px;">
                   <h3>⚠️ Disaster Types</h3>
                   <canvas id="disasterBarChart"></canvas>
                   <button id="exportBar" class="action-btn small">Export Chart</button>
@@ -152,6 +125,32 @@
               </div>
             </div>
           </div>
+    <script>
+      // Tab switching logic for Analytics/Extract Big Roads
+      document.addEventListener('DOMContentLoaded', function() {
+        const analyticsTab = document.querySelector('.menu-item[data-section="analytics"]');
+        const bigroadsTab = document.querySelector('.menu-item[data-section="bigroads"]');
+        const analyticsFeatures = document.getElementById('analyticsFeatures');
+        const bigroadsSection = document.getElementById('bigroadsSection');
+        function showTab(tab) {
+          if (tab === 'analytics') {
+            analyticsTab.classList.add('active');
+            bigroadsTab.classList.remove('active');
+            analyticsFeatures.style.display = 'flex';
+            bigroadsSection.style.display = 'none';
+          } else {
+            analyticsTab.classList.remove('active');
+            bigroadsTab.classList.add('active');
+            analyticsFeatures.style.display = 'none';
+            bigroadsSection.style.display = 'block';
+          }
+        }
+        analyticsTab.addEventListener('click', () => showTab('analytics'));
+        bigroadsTab.addEventListener('click', () => showTab('bigroads'));
+        // Show analytics by default
+        showTab('analytics');
+      });
+    </script>
         </div>
 
         <div class="bottom-panel">
