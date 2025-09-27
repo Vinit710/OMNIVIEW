@@ -27,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const trendsSection = document.getElementById('trendsSection');
   const classificationSection = document.getElementById('classificationSection');
   const ndviSection = document.getElementById('ndviSection');
+  const bigroadsSection = document.getElementById('bigroadsSection');
   // Sub-tab switching logic
   menuItems.forEach((item) => {
     item.addEventListener('click', function () {
@@ -37,14 +38,69 @@ document.addEventListener("DOMContentLoaded", () => {
       trendsSection.style.display = 'none';
       classificationSection.style.display = 'none';
       ndviSection.style.display = 'none';
+      bigroadsSection.style.display = 'none';
       // Show selected
       const section = this.getAttribute('data-section');
       if (section === 'overview') overviewSection.style.display = '';
       if (section === 'trends') trendsSection.style.display = '';
       if (section === 'classification') classificationSection.style.display = '';
       if (section === 'ndvi') ndviSection.style.display = '';
+      if (section === 'bigroads') bigroadsSection.style.display = '';
     });
   });
+
+  // --- Big Roads Extraction Feature ---
+  const bigRoadsForm = document.getElementById('bigRoadsForm');
+  const sentinelFile = document.getElementById('sentinelFile');
+  const bigRoadsStatus = document.getElementById('bigRoadsStatus');
+  const bigRoadsResults = document.getElementById('bigRoadsResults');
+  const bigRoadsOrig = document.getElementById('bigRoadsOrig');
+  const bigRoadsMask = document.getElementById('bigRoadsMask');
+  const bigRoadsOverlay = document.getElementById('bigRoadsOverlay');
+  const toggleOverlayBtn = document.getElementById('toggleOverlayBtn');
+  let overlayMode = true;
+
+  if (bigRoadsForm) {
+    bigRoadsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      bigRoadsStatus.textContent = 'Uploading and processing... (this may take a while)';
+      bigRoadsResults.style.display = 'none';
+      const file = sentinelFile.files[0];
+      if (!file) {
+        bigRoadsStatus.textContent = 'Please select a Sentinel-2 TIFF file.';
+        return;
+      }
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const resp = await fetch('http://localhost:5000/api/extract_roads', {
+          method: 'POST',
+          body: formData
+        });
+        if (!resp.ok) throw new Error('Processing failed');
+        const data = await resp.json();
+        // data: { orig_url, mask_url, overlay_url }
+        bigRoadsOrig.innerHTML = `<img src="${data.orig_url}" style="width:100%;height:100%;object-fit:contain;"/>`;
+        bigRoadsMask.innerHTML = `<img src="${data.mask_url}" style="width:100%;height:100%;object-fit:contain;"/>`;
+        bigRoadsOverlay.innerHTML = `<img id="overlayImg" src="${data.overlay_url}" style="width:100%;height:100%;object-fit:contain;"/>`;
+        bigRoadsResults.style.display = '';
+        bigRoadsStatus.textContent = 'Extraction complete!';
+        overlayMode = true;
+      } catch (err) {
+        bigRoadsStatus.textContent = 'Error: ' + err.message;
+      }
+    });
+    // Overlay toggle
+    if (toggleOverlayBtn) {
+      toggleOverlayBtn.addEventListener('click', () => {
+        overlayMode = !overlayMode;
+        const overlayImg = document.getElementById('overlayImg');
+        if (!overlayImg) return;
+        overlayImg.style.opacity = overlayMode ? '1' : '0.3';
+        toggleOverlayBtn.textContent = overlayMode ? 'Toggle Overlay' : 'Show Overlay';
+      });
+    }
+  }
 
   // Toggle dropdown
   sidebarTitleContainer.addEventListener("click", function (event) {

@@ -57,6 +57,10 @@
             <div class="item-icon">🌱</div>
             <span>NDVI</span>
           </div>
+          <div class="menu-item" data-section="bigroads">
+            <div class="item-icon">🛣️</div>
+            <span>Extract Big Roads</span>
+          </div>
         </div>
       </div>
 
@@ -117,6 +121,33 @@
                   <h3>⚠️ Disaster Types</h3>
                   <canvas id="disasterBarChart"></canvas>
                   <button id="exportBar" class="action-btn small">Export Chart</button>
+                </div>
+              </div>
+              <div class="bigroads-section" id="bigroadsSection" style="display:none;">
+                <div class="charts-card">
+                  <h3>🛣️ Extract Big Roads (Sentinel-2)</h3>
+                  <form id="bigRoadsForm">
+                    <input type="file" id="sentinelFile" accept=".tif,.tiff" required />
+                    <button type="submit" class="action-btn">Run Extraction</button>
+                  </form>
+                  <div id="bigRoadsStatus" style="margin:10px 0;color:#ff9800;"></div>
+                  <div id="bigRoadsResults" style="display:none;">
+                    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+                      <div>
+                        <h4>Original Image</h4>
+                        <div id="bigRoadsOrig" style="width:400px;height:400px;background:#222;"></div>
+                      </div>
+                      <div>
+                        <h4>Road Mask</h4>
+                        <div id="bigRoadsMask" style="width:400px;height:400px;background:#222;"></div>
+                      </div>
+                      <div>
+                        <h4>Overlay Comparison</h4>
+                        <div id="bigRoadsOverlay" style="width:400px;height:400px;background:#222;"></div>
+                        <button id="toggleOverlayBtn" class="action-btn small" style="margin-top:10px;">Toggle Overlay</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
