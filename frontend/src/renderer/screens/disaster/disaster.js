@@ -3,6 +3,7 @@ const fs = require("fs"),
 let currentSection = "news",
   isSearching = !1;
 const postDisasterSection = document.getElementById("postDisasterSection");
+const preDisasterContent = document.getElementById("preDisasterContent");
 let map,
   markersLayer,
   mapInitialized = !1,
@@ -13,8 +14,8 @@ const menuItems = document.querySelectorAll(".menu-item"),
   reportBtn = document.getElementById("reportBtn"),
   refreshBtn = document.getElementById("refreshBtn"),
   defaultContent = document.getElementById("defaultContent"),
-  newsResults = document.getElementById("newsResults"),
-  reportSection = document.getElementById("reportSection"),
+  newsResults = document.getElementById("newsResults");
+const reportSection = document.getElementById("reportSection"),
   sectionTitle = document.getElementById("sectionTitle"),
   resultsContainer = document.getElementById("resultsContainer"),
   reportContainer = document.getElementById("reportContainer"),
@@ -301,7 +302,7 @@ function createDisasterIcon(type) {
     } catch (e) {
       addLog("error", `Download failed: ${e.message}`);
     }
-  }),
+  }));
   document.addEventListener("DOMContentLoaded", function () {
     const e = document.getElementById("sidebarTitle"),
       t = document.getElementById("screenDropdown"),
@@ -396,4 +397,81 @@ function createDisasterIcon(type) {
     analysisContent.innerHTML = '<div class="error">Failed to generate analysis</div>';
     addLog('error', 'Failed to generate analysis: ' + error.message);
   }
-}));
+});
+
+// --- Pre-Disaster Map (like Post Disaster, but shows weather on click) ---
+let preDisasterMap, preDisasterWeatherMarker;
+
+function showPreDisaster() {
+  defaultContent.style.display = "none";
+  newsResults.style.display = "none";
+  reportSection.style.display = "none";
+  postDisasterSection.style.display = "none";
+  preDisasterContent.style.display = "block";
+  document.getElementById('preWeatherHeadline').innerHTML = ""; // Clear headline on tab switch
+  if (!preDisasterMap) initPreDisasterMap();
+}
+
+function hidePreDisaster() {
+  preDisasterContent.style.display = "none";
+  document.getElementById('preWeatherHeadline').innerHTML = "";
+}
+
+function initPreDisasterMap() {
+  preDisasterMap = L.map('preDisasterMap').setView([20, 0], 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(preDisasterMap);
+
+  preDisasterMap.on('click', function(e) {
+    const { lat, lng } = e.latlng;
+    if (preDisasterWeatherMarker) preDisasterMap.removeLayer(preDisasterWeatherMarker);
+    preDisasterWeatherMarker = L.marker([lat, lng]).addTo(preDisasterMap);
+    document.getElementById('preWeatherHeadline').innerHTML = '<div class="loading">Fetching weather...</div>';
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,precipitation,weather_code,windspeed_10m,cloud_cover&timezone=auto`)
+      .then(res => res.json())
+      .then(data => {
+        const w = data.current;
+        const headline = `
+          <div style="color:#ffd700; font-size:1.2rem; font-weight:bold; margin-bottom:8px;">
+            Weather at (${lat.toFixed(2)}, ${lng.toFixed(2)}): 
+            ${w.temperature_2m}°C, ${w.precipitation}mm rain, ${w.windspeed_10m}km/h wind, ${w.cloud_cover}% clouds.
+            <span style="color:#64b5f6; margin-left:12px;"><b>AI:</b> ${getAISummary(w)}</span>
+          </div>
+        `;
+        document.getElementById('preWeatherHeadline').innerHTML = headline;
+      })
+      .catch(() => {
+        document.getElementById('preWeatherHeadline').innerHTML = '<div class="error">Failed to fetch weather data.</div>';
+      });
+  });
+}
+
+// Hardcoded AI summary logic (demo)
+function getAISummary(w) {
+  if (w.precipitation > 20) return "⚠️ High risk of flooding due to heavy rainfall.";
+  if (w.temperature_2m > 40) return "⚠️ Extreme heat detected. Possible heatwave.";
+  if (w.windspeed_10m > 60) return "⚠️ Severe wind speeds. Storm risk present.";
+  if (w.cloud_cover > 90) return "Heavy cloud cover, possible storms.";
+  return "No immediate disaster risk detected.";
+}
+
+// Attach to menu items (update this block)
+menuItems.forEach((item) => {
+  item.addEventListener("click", function () {
+    menuItems.forEach((i) => i.classList.remove("active"));
+    this.classList.add("active");
+    currentSection = this.getAttribute("data-section");
+    updateSectionTitle();
+    if (currentSection === "post-disaster") {
+      showPostDisaster();
+      hidePreDisaster();
+    } else if (currentSection === "pre-disaster") {
+      showPreDisaster();
+    } else if (currentSection === "news") {
+      isSearching || loadDefaultContent();
+      hidePreDisaster();
+    }
+  });
+});
