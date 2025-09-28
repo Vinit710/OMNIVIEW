@@ -165,8 +165,8 @@ body {
 /* Content Area */
 .content-area {
   flex: 1;
-  padding: 20px;
   overflow-y: auto;
+  padding-bottom: 140px; /* enough space for logs panel */
 }
 
 .section-title {
@@ -556,4 +556,9 @@ body {
 .disaster-marker {
   background: none;
   border: none;
+}
+
+.pre-disaster-section, #preDisasterContent {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
 }
