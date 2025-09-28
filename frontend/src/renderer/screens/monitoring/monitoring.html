@@ -116,6 +116,78 @@
     <script src="monitoring.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
+      // Add this logging system after the map initialization
+      class Logger {
+        constructor() {
+          this.logs = [];
+          this.logContainer = document.querySelector(".logs-content");
+          this.maxLogs = 50; // Keep only last 50 logs
+        }
+
+        log(message, type = "info") {
+          const timestamp = new Date().toLocaleTimeString();
+          const logEntry = {
+            timestamp,
+            message,
+            type,
+          };
+
+          this.logs.unshift(logEntry);
+
+          // Keep only recent logs
+          if (this.logs.length > this.maxLogs) {
+            this.logs = this.logs.slice(0, this.maxLogs);
+          }
+
+          this.updateDisplay();
+        }
+
+        info(message) {
+          this.log(message, "info");
+        }
+
+        warning(message) {
+          this.log(message, "warning");
+        }
+
+        error(message) {
+          this.log(message, "error");
+        }
+
+        success(message) {
+          this.log(message, "success");
+        }
+
+        clear() {
+          this.logs = [];
+          this.updateDisplay();
+        }
+
+        updateDisplay() {
+          this.logContainer.innerHTML = "";
+
+          if (this.logs.length === 0) {
+            this.logContainer.innerHTML =
+              '<div class="log-info">No logs available</div>';
+            return;
+          }
+
+          this.logs.forEach((log) => {
+            const logDiv = document.createElement("div");
+            logDiv.className = `log-${log.type}`;
+            logDiv.innerHTML = `<span class="log-timestamp">[${log.timestamp}]</span> ${log.message}`;
+            this.logContainer.appendChild(logDiv);
+          });
+        }
+      }
+
+      // Initialize logger
+      const logger = new Logger();
+
+      // Initial log
+      logger.info("Application started");
+      logger.warning("No area selected for analysis");
+
       // === Base Layers ===
       const defaultLayer = L.tileLayer(
         "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -177,6 +249,9 @@
             .forEach((i) => i.classList.remove("active"));
           this.classList.add("active");
 
+          const featureName = this.querySelector("span").textContent;
+          logger.info(`Switched to ${featureName} monitoring`);
+
           // Clear all layers and stop any running processes
           Object.values(featureLayers).forEach((layer) => layer.clearLayers());
           if (updateFlightsInterval) {
@@ -196,30 +271,31 @@
           switch (index) {
             case 0: // Buildings
               activeFeature = "buildings";
-              // Add your buildings feature code here
+              logger.info("Buildings monitoring activated");
               break;
 
             case 1: // Roads
               activeFeature = "roads";
               areaSelectMode = true;
               map.getContainer().style.cursor = "crosshair";
-              alert(
-                "Click on the map to select the center of a 1km x 1km area for road extraction."
+              logger.info(
+                "Road extraction mode enabled - click on map to select area"
               );
               break;
 
             case 2: // Water Bodies
               activeFeature = "water";
-              // Add your water bodies feature code here
+              logger.info("Water bodies monitoring activated");
               break;
 
             case 3: // Ships
               activeFeature = "ships";
-              // Add your ships feature code here
+              logger.info("Ships monitoring activated");
               break;
 
             case 4: // Aircraft
               activeFeature = "aircraft";
+              logger.info("Aircraft tracking activated");
               // Clear any existing interval
               if (updateFlightsInterval) {
                 clearInterval(updateFlightsInterval);
@@ -286,13 +362,17 @@
       map.on("click", function (e) {
         if (!areaSelectMode) return;
 
+        logger.info(
+          `Area selected at coordinates: ${e.latlng.lat.toFixed(4)}°N, ${e.latlng.lng.toFixed(4)}°E`
+        );
+
         if (areaRectangle) {
           featureLayers.roads.removeLayer(areaRectangle);
           areaRectangle = null;
         }
 
         // Remove existing control if present
-        const existingControl = document.querySelector('.area-control');
+        const existingControl = document.querySelector(".area-control");
         if (existingControl) {
           existingControl.remove();
         }
@@ -306,8 +386,8 @@
         }).addTo(featureLayers.roads);
 
         // Create custom control
-        const controlDiv = document.createElement('div');
-        controlDiv.className = 'area-control';
+        const controlDiv = document.createElement("div");
+        controlDiv.className = "area-control";
         controlDiv.innerHTML = `
           <b>Area Selected</b><br>
           <div style="margin-bottom: 10px;">
@@ -319,7 +399,7 @@
         `;
 
         // Add control to the map container
-        document.querySelector('.map-container').appendChild(controlDiv);
+        document.querySelector(".map-container").appendChild(controlDiv);
 
         // Add size change handler
         const sizeInput = document.getElementById("areaSize");
@@ -330,6 +410,7 @@
               const newBounds = getSquareBounds(e.latlng, newSize);
               selectedBounds = newBounds;
               areaRectangle.setBounds(newBounds);
+              logger.info(`Area size updated to ${newSize}m x ${newSize}m`);
             }
           };
         }
@@ -338,112 +419,130 @@
         const extractBtn = document.getElementById("extractRoadsBtn");
         if (extractBtn) {
           extractBtn.onclick = async () => {
+            logger.info("Starting road extraction process...");
             areaSelectMode = false;
             map.getContainer().style.cursor = "";
             map.fitBounds(selectedBounds);
 
             // Remove the control before taking screenshot
-            controlDiv.style.display = 'none';
+            controlDiv.style.display = "none";
 
             setTimeout(async () => {
-              const mapDiv = document.getElementById("map");
-              const canvas = await html2canvas(mapDiv, {
-                useCORS: true,
-                backgroundColor: null,
-              });
+              try {
+                logger.info("Capturing map area screenshot...");
+                const mapDiv = document.getElementById("map");
+                const canvas = await html2canvas(mapDiv, {
+                  useCORS: true,
+                  backgroundColor: null,
+                });
 
-              // Get pixel coordinates for bounds
-              const nw = map.latLngToContainerPoint(selectedBounds[0]);
-              const se = map.latLngToContainerPoint(selectedBounds[1]);
+                // Get pixel coordinates for bounds
+                const nw = map.latLngToContainerPoint(selectedBounds[0]);
+                const se = map.latLngToContainerPoint(selectedBounds[1]);
 
-              // Calculate crop dimensions
-              const x = Math.min(nw.x, se.x);
-              const y = Math.min(nw.y, se.y);
-              const width = Math.abs(se.x - nw.x);
-              const height = Math.abs(se.y - nw.y);
+                // Calculate crop dimensions
+                const x = Math.min(nw.x, se.x);
+                const y = Math.min(nw.y, se.y);
+                const width = Math.abs(se.x - nw.x);
+                const height = Math.abs(se.y - nw.y);
 
-              // Crop the canvas
-              const croppedCanvas = document.createElement("canvas");
-              croppedCanvas.width = width;
-              croppedCanvas.height = height;
-              const ctx = croppedCanvas.getContext("2d");
-              ctx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
+                // Crop the canvas
+                const croppedCanvas = document.createElement("canvas");
+                croppedCanvas.width = width;
+                croppedCanvas.height = height;
+                const ctx = croppedCanvas.getContext("2d");
+                ctx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
 
-              const imageBase64 = croppedCanvas.toDataURL("image/png");
+                const imageBase64 = croppedCanvas.toDataURL("image/png");
 
-              // Show preview of cropped area
-              areaRectangle
-                .bindPopup(
-                  `<b>Processing Area</b><br>
+                // Show preview of cropped area
+                areaRectangle
+                  .bindPopup(
+                    `<b>Processing Area</b><br>
           <div>
             <strong>Selected Area Image:</strong><br>
             <img src="${imageBase64}" style="width:100%;max-width:300px;"><br>
             <div style="text-align:center">Processing...</div>
           </div>`
-                )
-                .openPopup();
+                  )
+                  .openPopup();
 
-              fetch("http://localhost:5000/api/road-detection", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ image_base64: imageBase64 }),
-              })
-                .then(async (res) => {
-                  const body = await res.json().catch(() => ({}));
-                  if (!res.ok) {
-                    areaRectangle
-                      .bindPopup(`<b>Error</b><br>${body.error || "Server error"}`)
-                      .openPopup();
-                    return;
+                logger.info("Sending image to server for road detection...");
+
+                const response = await fetch(
+                  "http://localhost:5000/api/road-detection",
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ image_base64: imageBase64 }),
                   }
-                  const probMask = body.probability_mask;
-                  areaRectangle
-                    .bindPopup(
-                      `<b>Road Detection Result</b><br>
-              <div>
-                <strong>Input Image:</strong><br>
-                <img src="${imageBase64}" style="width:100%;max-width:300px;"><br>
-                <strong>Road Mask:</strong><br>
-                <img src="${probMask}" style="width:100%;max-width:300px;"><br>
-                <button id="downloadInputBtn">Download Input</button>
-                <button id="downloadMaskBtn">Download Mask</button>
-              </div>`
-                    )
-                    .openPopup();
+                );
 
-                  setTimeout(() => {
-                    // Download Input Image
-                    const downloadInputBtn = document.getElementById("downloadInputBtn");
-                    if (downloadInputBtn) {
-                      downloadInputBtn.onclick = () => {
-                        const link = document.createElement("a");
-                        link.href = imageBase64;
-                        link.download = "road_input.png";
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                      };
-                    }
+                const body = await response.json().catch(() => ({}));
 
-                    // Download Mask Image
-                    const downloadMaskBtn = document.getElementById("downloadMaskBtn");
-                    if (downloadMaskBtn) {
-                      downloadMaskBtn.onclick = () => {
-                        const link = document.createElement("a");
-                        link.href = probMask;
-                        link.download = "road_mask.png";
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                      };
-                    }
-                  }, 150);
-                })
-                .catch((err) => {
+                if (!response.ok) {
+                  const errorMsg =
+                    body.error || `Server error (${response.status})`;
+                  logger.error(`Road detection failed: ${errorMsg}`);
                   areaRectangle
-                    .bindPopup("Error extracting roads (network/server).")
+                    .bindPopup(`<b>Error</b><br>${errorMsg}`)
                     .openPopup();
-                });
+                  return;
+                }
+
+                logger.success("Road detection completed successfully");
+                const probMask = body.probability_mask;
+                areaRectangle
+                  .bindPopup(
+                    `<b>Road Detection Result</b><br>
+            <div>
+              <strong>Input Image:</strong><br>
+              <img src="${imageBase64}" style="width:100%;max-width:300px;"><br>
+              <strong>Road Mask:</strong><br>
+              <img src="${probMask}" style="width:100%;max-width:300px;"><br>
+              <button id="downloadInputBtn">Download Input</button>
+              <button id="downloadMaskBtn">Download Mask</button>
+            </div>`
+                  )
+                  .openPopup();
+
+                setTimeout(() => {
+                  // Download Input Image
+                  const downloadInputBtn =
+                    document.getElementById("downloadInputBtn");
+                  if (downloadInputBtn) {
+                    downloadInputBtn.onclick = () => {
+                      const link = document.createElement("a");
+                      link.href = imageBase64;
+                      link.download = "road_input.png";
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      logger.info("Input image downloaded");
+                    };
+                  }
+
+                  // Download Mask Image
+                  const downloadMaskBtn =
+                    document.getElementById("downloadMaskBtn");
+                  if (downloadMaskBtn) {
+                    downloadMaskBtn.onclick = () => {
+                      const link = document.createElement("a");
+                      link.href = probMask;
+                      link.download = "road_mask.png";
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      logger.info("Road mask downloaded");
+                    };
+                  }
+                }, 150);
+              } catch (error) {
+                logger.error(`Network error: ${error.message}`);
+                areaRectangle
+                  .bindPopup(`<b>Error</b><br>Network error: ${error.message}`)
+                  .openPopup();
+              }
             }, 1000);
           };
         }
@@ -457,6 +556,7 @@
             areaSelectMode = false;
             map.getContainer().style.cursor = "";
             controlDiv.remove();
+            logger.info("Area selection cancelled");
           };
         }
       });
@@ -498,6 +598,7 @@
 
       async function updateFlights() {
         try {
+          logger.info("Fetching aircraft data...");
           const res = await fetch("http://localhost:5000/api/flights");
           if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
@@ -508,7 +609,7 @@
             featureLayers.aircraft.clearLayers(); // Clear the correct layer
 
             if (!data.states || !Array.isArray(data.states)) {
-              console.warn("No flight data available or invalid format");
+              logger.warning("No flight data available or invalid format");
               return;
             }
 
@@ -539,6 +640,7 @@
               });
             }
 
+            let validPlanesCount = 0;
             planes.forEach((state) => {
               const lat = state[6];
               const lon = state[5];
@@ -561,16 +663,32 @@
             `);
 
                   marker.addTo(featureLayers.aircraft); // Add to the correct layer
+                  validPlanesCount++;
                 }
               }
             });
 
-            console.log(`Updated ${planes.length} aircraft positions`);
+            logger.success(`Updated ${validPlanesCount} aircraft positions`);
           }
         } catch (err) {
-          console.error("Failed to fetch aircraft data:", err);
+          logger.error(`Failed to fetch aircraft data: ${err.message}`);
         }
       }
+
+      // Add a clear logs button to the panel header
+      const panelHeader = document.querySelector(".panel-header");
+      const clearLogsBtn = document.createElement("button");
+      clearLogsBtn.textContent = "Clear";
+      clearLogsBtn.className = "expand-btn";
+      clearLogsBtn.style.marginRight = "8px";
+      clearLogsBtn.onclick = () => {
+        logger.clear();
+        logger.info("Logs cleared");
+      };
+      panelHeader.insertBefore(
+        clearLogsBtn,
+        panelHeader.querySelector(".expand-btn")
+      );
     </script>
   </body>
 </html>
