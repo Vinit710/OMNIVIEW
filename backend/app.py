@@ -495,7 +495,7 @@ class DisasterResponseAgent:
         # Try Gemini first
         if provider == "gemini" and GEMINI_API_KEY:
             try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-2.5-flash')
                 response = model.generate_content(prompt)
                 if response and response.text:
                     return response.text
