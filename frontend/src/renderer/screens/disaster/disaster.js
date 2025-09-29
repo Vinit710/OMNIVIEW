@@ -173,32 +173,44 @@ function showPostDisaster() {
     mapInitialized || (initMap(), (mapInitialized = !0)));
 }
 function initMap() {
-  ((map = L.map("map").setView([20, 0], 2)),
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 18,
-      attribution: "&copy; OpenStreetMap contributors",
-    }).addTo(map),
-    (markersLayer = L.layerGroup().addTo(map)),
-    fetch("http://localhost:5000/api/disaster-csv")
-      .then((e) => e.json())
-      .then((e) => {
-        ((disasterPoints = e),
-          populateCountryFilter(e),
-          populateYearFilter(e),
-          (document.getElementById("countryFilter").value = "India"),
-          (document.getElementById("yearFilter").value = "2010"),
-          filterAndRenderMarkers());
-      })
-      .catch((e) => {
-        (addLog("error", "Failed to load disaster points: " + e.message),
-          console.error("CSV load error:", e));
-      }),
-    document
-      .getElementById("countryFilter")
-      .addEventListener("change", filterAndRenderMarkers),
-    document
-      .getElementById("yearFilter")
-      .addEventListener("change", filterAndRenderMarkers));
+  (((map = L.map("map").setView([20, 0], 2)),
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    zoom: 5,
+    minZoom: 3,
+    maxZoom: 18,
+    maxBounds: [
+      [-90, -180],
+      [90, 180],
+    ],
+    maxBoundsViscosity: 1.0,
+    attribution: "&copy; OpenStreetMap contributors",
+    noWrap: true,
+  }).addTo(map),
+  (markersLayer = L.layerGroup().addTo(map)),
+  fetch("http://localhost:5000/api/disaster-csv")
+    .then((e) => e.json())
+    .then((e) => {
+      ((disasterPoints = e),
+        populateCountryFilter(e),
+        populateYearFilter(e),
+        (document.getElementById("countryFilter").value = "India"),
+        (document.getElementById("yearFilter").value = "2010"),
+        filterAndRenderMarkers());
+    })
+    .catch((e) => {
+      (addLog("error", "Failed to load disaster points: " + e.message),
+        console.error("CSV load error:", e));
+    }),
+  document
+    .getElementById("countryFilter")
+    .addEventListener("change", filterAndRenderMarkers),
+  document
+    .getElementById("yearFilter")
+    .addEventListener("change", filterAndRenderMarkers)),
+    map.setMaxBounds([
+      [-90, -180],
+      [90, 180],
+    ]));
 }
 function filterAndRenderMarkers() {
   const e = document.getElementById("countryFilter").value,
@@ -214,25 +226,25 @@ function filterAndRenderMarkers() {
 function renderDisasterMarkers(points) {
   markersLayer.clearLayers();
   const latlngs = [];
-  
+
   points.forEach((pt) => {
     if (pt.latitude && pt.longitude) {
       latlngs.push([pt.latitude, pt.longitude]);
-      
+
       const marker = L.marker([pt.latitude, pt.longitude], {
         icon: createDisasterIcon(pt.disastertype),
-        title: pt.location
+        title: pt.location,
       })
-      .addTo(markersLayer)
-      .bindPopup(
-        `<b>${pt.disastertype || "Disaster"}</b><br>
+        .addTo(markersLayer)
+        .bindPopup(
+          `<b>${pt.disastertype || "Disaster"}</b><br>
          <b>Year:</b> ${pt.year || "N/A"}<br>
          <b>Location:</b> ${pt.location || "N/A"}<br>
          <b>Country:</b> ${pt.country || "N/A"}`
-      );
+        );
     }
   });
-  
+
   if (latlngs.length) map.fitBounds(latlngs);
 }
 function populateCountryFilter(e) {
@@ -303,51 +315,51 @@ function createDisasterIcon(type) {
       addLog("error", `Download failed: ${e.message}`);
     }
   }));
-  document.addEventListener("DOMContentLoaded", function () {
-    const e = document.getElementById("sidebarTitle"),
-      t = document.getElementById("screenDropdown"),
-      n = document.querySelector(".dropdown-arrow"),
-      r = document.querySelectorAll(".dropdown-item"),
-      o = document.querySelector(".sidebar-title-container");
-    (o.addEventListener("click", function (e) {
-      (e.preventDefault(),
-        e.stopPropagation(),
-        t.classList.toggle("show"),
-        n.classList.toggle("rotated"));
-    }),
-      window.addEventListener("click", function (e) {
-        o.contains(e.target) ||
-          (t.classList.remove("show"), n.classList.remove("rotated"));
-      }),
-      t.addEventListener("click", function (e) {
-        e.stopPropagation();
-      }),
-      r.forEach((o) => {
-        o.addEventListener("click", function (o) {
-          o.stopPropagation();
-          const s = this.getAttribute("data-screen"),
-            a = this.querySelector("span").textContent;
-          (r.forEach((e) => e.classList.remove("active")),
-            this.classList.add("active"),
-            (e.textContent = a),
-            t.classList.remove("show"),
-            n.classList.remove("rotated"),
-            (function (e) {
-              switch (e) {
-                case "monitoring":
-                  window.location.href = "../monitoring/monitoring.html";
-                  break;
-                case "disaster":
-                  console.log("Already on Disaster Analysis screen");
-                  break;
-                case "analytics":
-                  window.location.href = "../analysis/analysis.html";
-                  break;
-              }
-            })(s));
-        });
-      }));
+(document.addEventListener("DOMContentLoaded", function () {
+  const e = document.getElementById("sidebarTitle"),
+    t = document.getElementById("screenDropdown"),
+    n = document.querySelector(".dropdown-arrow"),
+    r = document.querySelectorAll(".dropdown-item"),
+    o = document.querySelector(".sidebar-title-container");
+  (o.addEventListener("click", function (e) {
+    (e.preventDefault(),
+      e.stopPropagation(),
+      t.classList.toggle("show"),
+      n.classList.toggle("rotated"));
   }),
+    window.addEventListener("click", function (e) {
+      o.contains(e.target) ||
+        (t.classList.remove("show"), n.classList.remove("rotated"));
+    }),
+    t.addEventListener("click", function (e) {
+      e.stopPropagation();
+    }),
+    r.forEach((o) => {
+      o.addEventListener("click", function (o) {
+        o.stopPropagation();
+        const s = this.getAttribute("data-screen"),
+          a = this.querySelector("span").textContent;
+        (r.forEach((e) => e.classList.remove("active")),
+          this.classList.add("active"),
+          (e.textContent = a),
+          t.classList.remove("show"),
+          n.classList.remove("rotated"),
+          (function (e) {
+            switch (e) {
+              case "monitoring":
+                window.location.href = "../monitoring/monitoring.html";
+                break;
+              case "disaster":
+                console.log("Already on Disaster Analysis screen");
+                break;
+              case "analytics":
+                window.location.href = "../analysis/analysis.html";
+                break;
+            }
+          })(s));
+      });
+    }));
+}),
   updateSectionTitle(),
   loadDefaultContent(),
   document.querySelector(".expand-btn").addEventListener("click", function () {
@@ -356,48 +368,55 @@ function createDisasterIcon(type) {
       ? ((e.style.height = "120px"), (this.textContent = "Expand ▲"))
       : ((e.style.height = "300px"), (this.textContent = "Collapse ▼"));
   }),
-  document.getElementById('generateAnalysisBtn').addEventListener('click', async function() {
-  const analysisResult = document.getElementById('analysisResult');
-  const analysisContent = document.getElementById('analysisContent');
-  
-  // Get currently displayed disasters
-  const currentDisasters = [];
-  markersLayer.eachLayer(marker => {
-    const position = marker.getLatLng();
-    const popup = marker.getPopup();
-    currentDisasters.push({
-      latitude: position.lat,
-      longitude: position.lng,
-      details: popup.getContent()
-    });
-  });
+  document
+    .getElementById("generateAnalysisBtn")
+    .addEventListener("click", async function () {
+      const analysisResult = document.getElementById("analysisResult");
+      const analysisContent = document.getElementById("analysisContent");
 
-  analysisContent.innerHTML = '<div class="loading">Generating analysis...</div>';
-  analysisResult.style.display = 'block';
+      // Get currently displayed disasters
+      const currentDisasters = [];
+      markersLayer.eachLayer((marker) => {
+        const position = marker.getLatLng();
+        const popup = marker.getPopup();
+        currentDisasters.push({
+          latitude: position.lat,
+          longitude: position.lng,
+          details: popup.getContent(),
+        });
+      });
 
-  try {
-    const response = await fetch('http://localhost:5000/api/analyze-disasters', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        disasters: currentDisasters,
-        country: document.getElementById('countryFilter').value,
-        year: document.getElementById('yearFilter').value
-      })
-    });
+      analysisContent.innerHTML =
+        '<div class="loading">Generating analysis...</div>';
+      analysisResult.style.display = "block";
 
-    const data = await response.json();
-    analysisContent.innerHTML = `
+      try {
+        const response = await fetch(
+          "http://localhost:5000/api/analyze-disasters",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              disasters: currentDisasters,
+              country: document.getElementById("countryFilter").value,
+              year: document.getElementById("yearFilter").value,
+            }),
+          }
+        );
+
+        const data = await response.json();
+        analysisContent.innerHTML = `
       <div class="analysis-content">
         ${markdownToHtml(data.analysis)}
       </div>
     `;
-    addLog('info', 'Generated disaster analysis report');
-  } catch (error) {
-    analysisContent.innerHTML = '<div class="error">Failed to generate analysis</div>';
-    addLog('error', 'Failed to generate analysis: ' + error.message);
-  }
-});
+        addLog("info", "Generated disaster analysis report");
+      } catch (error) {
+        analysisContent.innerHTML =
+          '<div class="error">Failed to generate analysis</div>';
+        addLog("error", "Failed to generate analysis: " + error.message);
+      }
+    }));
 
 // --- Pre-Disaster Map (like Post Disaster, but shows weather on click) ---
 let preDisasterMap, preDisasterWeatherMarker;
@@ -408,30 +427,45 @@ function showPreDisaster() {
   reportSection.style.display = "none";
   postDisasterSection.style.display = "none";
   preDisasterContent.style.display = "block";
-  document.getElementById('preWeatherHeadline').innerHTML = ""; // Clear headline on tab switch
+  document.getElementById("preWeatherHeadline").innerHTML = ""; // Clear headline on tab switch
   if (!preDisasterMap) initPreDisasterMap();
 }
 
 function hidePreDisaster() {
   preDisasterContent.style.display = "none";
-  document.getElementById('preWeatherHeadline').innerHTML = "";
+  document.getElementById("preWeatherHeadline").innerHTML = "";
 }
 
 function initPreDisasterMap() {
-  preDisasterMap = L.map('preDisasterMap').setView([20, 0], 2);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  preDisasterMap = L.map("preDisasterMap").setView([20, 0], 2);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    zoom: 5,
+    minZoom: 3,
     maxZoom: 18,
-    attribution: "&copy; OpenStreetMap contributors"
+    maxBounds: [
+      [-90, -180],
+      [90, 180],
+    ],
+    attribution: "&copy; OpenStreetMap contributors",
+    noWrap: true,
   }).addTo(preDisasterMap);
 
-  preDisasterMap.on('click', function(e) {
+  preDisasterMap.setMaxBounds([
+    [-90, -180],
+    [90, 180],
+  ]);
+  preDisasterMap.on("click", function (e) {
     const { lat, lng } = e.latlng;
-    if (preDisasterWeatherMarker) preDisasterMap.removeLayer(preDisasterWeatherMarker);
+    if (preDisasterWeatherMarker)
+      preDisasterMap.removeLayer(preDisasterWeatherMarker);
     preDisasterWeatherMarker = L.marker([lat, lng]).addTo(preDisasterMap);
-    document.getElementById('preWeatherHeadline').innerHTML = '<div class="loading">Fetching weather...</div>';
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,precipitation,weather_code,windspeed_10m,cloud_cover&timezone=auto`)
-      .then(res => res.json())
-      .then(data => {
+    document.getElementById("preWeatherHeadline").innerHTML =
+      '<div class="loading">Fetching weather...</div>';
+    fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,precipitation,weather_code,windspeed_10m,cloud_cover&timezone=auto`
+    )
+      .then((res) => res.json())
+      .then((data) => {
         const w = data.current;
         const headline = `
           <div style="color:#ffd700; font-size:1.2rem; font-weight:bold; margin-bottom:8px;">
@@ -440,18 +474,21 @@ function initPreDisasterMap() {
             <span style="color:#64b5f6; margin-left:12px;"><b>AI:</b> ${getAISummary(w)}</span>
           </div>
         `;
-        document.getElementById('preWeatherHeadline').innerHTML = headline;
+        document.getElementById("preWeatherHeadline").innerHTML = headline;
       })
       .catch(() => {
-        document.getElementById('preWeatherHeadline').innerHTML = '<div class="error">Failed to fetch weather data.</div>';
+        document.getElementById("preWeatherHeadline").innerHTML =
+          '<div class="error">Failed to fetch weather data.</div>';
       });
   });
 }
 
 // Hardcoded AI summary logic (demo)
 function getAISummary(w) {
-  if (w.precipitation > 20) return "⚠️ High risk of flooding due to heavy rainfall.";
-  if (w.temperature_2m > 40) return "⚠️ Extreme heat detected. Possible heatwave.";
+  if (w.precipitation > 20)
+    return "⚠️ High risk of flooding due to heavy rainfall.";
+  if (w.temperature_2m > 40)
+    return "⚠️ Extreme heat detected. Possible heatwave.";
   if (w.windspeed_10m > 60) return "⚠️ Severe wind speeds. Storm risk present.";
   if (w.cloud_cover > 90) return "Heavy cloud cover, possible storms.";
   return "No immediate disaster risk detected.";
