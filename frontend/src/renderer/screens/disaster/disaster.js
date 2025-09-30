@@ -45,7 +45,7 @@ function performSearch() {
     ? ((isSearching = !0),
       showNewsResults(),
       showLoading(),
-      fetch("http://localhost:5000/api/news", {
+      fetch(API_CONFIG.getUrl("NEWS"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: e, section: currentSection }),
@@ -69,7 +69,7 @@ function generateReport() {
       (reportContainer.innerHTML =
         '<div class="loading">Generating report...</div>'),
       addLog("info", `Generating report for "${e}"`),
-      fetch("http://localhost:5000/api/generate_report", {
+      fetch(API_CONFIG.getUrl("GENERATE_REPORT"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: e }),
@@ -207,7 +207,7 @@ function initMap() {
     noWrap: true,
   }).addTo(map),
   (markersLayer = L.layerGroup().addTo(map)),
-  fetch("http://localhost:5000/api/disaster-csv")
+  fetch(API_CONFIG.getUrl("DISASTER_CSV"))
     .then((e) => e.json())
     .then((e) => {
       ((disasterPoints = e),
@@ -411,18 +411,15 @@ function createDisasterIcon(type) {
       analysisResult.style.display = "block";
 
       try {
-        const response = await fetch(
-          "http://localhost:5000/api/analyze-disasters",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              disasters: currentDisasters,
-              country: document.getElementById("countryFilter").value,
-              year: document.getElementById("yearFilter").value,
-            }),
-          }
-        );
+        const response = await fetch(API_CONFIG.getUrl("ANALYZE_DISASTERS"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            disasters: currentDisasters,
+            country: document.getElementById("countryFilter").value,
+            year: document.getElementById("yearFilter").value,
+          }),
+        });
 
         const data = await response.json();
         analysisContent.innerHTML = `

@@ -113,6 +113,7 @@
       </div>
     </div>
     <!-- Closing tag for main-container -->
+    <script src="../config.js"></script>
     <script src="monitoring.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
@@ -470,7 +471,7 @@
                 logger.info("Sending image to server for road detection...");
 
                 const response = await fetch(
-                  "http://localhost:5000/api/road-detection",
+                  API_CONFIG.getUrl("ROAD_DETECTION"),
                   {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -599,7 +600,7 @@
       async function updateFlights() {
         try {
           logger.info("Fetching aircraft data...");
-          const res = await fetch("http://localhost:5000/api/flights");
+          const res = await fetch(API_CONFIG.getUrl("FLIGHTS"));
           if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
           const data = await res.json();

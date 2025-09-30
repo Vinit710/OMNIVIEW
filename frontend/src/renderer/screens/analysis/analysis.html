@@ -16,7 +16,6 @@
   </head>
   <body>
     <div class="main-container">
-
       <div class="sidebar">
         <div class="sidebar-header">
           <div class="sidebar-title-container">
@@ -42,10 +41,14 @@
         </div>
         <div class="menu-section">
           <div class="menu-item active" data-section="analytics">
-            <button class="sidebar-btn"><span class="item-icon">�</span> Analytics</button>
+            <button class="sidebar-btn">
+              <span class="item-icon">�</span> Analytics
+            </button>
           </div>
           <div class="menu-item" data-section="bigroads">
-            <button class="sidebar-btn"><span class="item-icon">🛣️</span> Extract Big Roads</button>
+            <button class="sidebar-btn">
+              <span class="item-icon">🛣️</span> Extract Big Roads
+            </button>
           </div>
         </div>
       </div>
@@ -73,51 +76,108 @@
               </label>
             </div>
             <div class="analytics-grid">
-              <div id="analyticsFeatures" style="display: flex; flex-wrap: wrap; gap: 24px; width: 100%;">
-                <div class="map-card" style="flex:1 1 350px; min-width:340px; max-width:600px;">
+              <div
+                id="analyticsFeatures"
+                style="display: flex; flex-wrap: wrap; gap: 24px; width: 100%"
+              >
+                <div
+                  class="map-card"
+                  style="flex: 1 1 350px; min-width: 340px; max-width: 600px"
+                >
                   <h3>🌍 Earth Observation Map</h3>
                   <div id="map" style="height: 400px"></div>
-                  <button id="analyzeBtn" class="action-btn">Analyze Selected Area</button>
+                  <button id="analyzeBtn" class="action-btn">
+                    Analyze Selected Area
+                  </button>
                   <button id="ndviBtn" class="action-btn">Compute NDVI</button>
                 </div>
-                <div class="charts-card" style="flex:1 1 350px; min-width:340px; max-width:600px;">
+                <div
+                  class="charts-card"
+                  style="flex: 1 1 350px; min-width: 340px; max-width: 600px"
+                >
                   <h3>📈 Disaster Trends</h3>
-                  <input type="range" id="timeSlider" min="2019" max="2025" value="2025" style="width: 100%" />
+                  <input
+                    type="range"
+                    id="timeSlider"
+                    min="2019"
+                    max="2025"
+                    value="2025"
+                    style="width: 100%"
+                  />
                   <canvas id="trendChart"></canvas>
-                  <button id="exportTrend" class="action-btn small">Export Chart</button>
+                  <button id="exportTrend" class="action-btn small">
+                    Export Chart
+                  </button>
                 </div>
-                <div class="charts-card" style="flex:1 1 350px; min-width:340px; max-width:600px;">
+                <div
+                  class="charts-card"
+                  style="flex: 1 1 350px; min-width: 340px; max-width: 600px"
+                >
                   <h3>🗺️ Land Classification</h3>
                   <canvas id="classificationChart"></canvas>
                 </div>
-                <div class="charts-card" style="flex:1 1 350px; min-width:340px; max-width:600px;">
+                <div
+                  class="charts-card"
+                  style="flex: 1 1 350px; min-width: 340px; max-width: 600px"
+                >
                   <h3>⚠️ Disaster Types</h3>
                   <canvas id="disasterBarChart"></canvas>
-                  <button id="exportBar" class="action-btn small">Export Chart</button>
+                  <button id="exportBar" class="action-btn small">
+                    Export Chart
+                  </button>
                 </div>
               </div>
-              <div class="bigroads-section" id="bigroadsSection" style="display:none;">
+              <div
+                class="bigroads-section"
+                id="bigroadsSection"
+                style="display: none"
+              >
                 <div class="charts-card">
                   <h3>🛣️ Extract Big Roads (Sentinel-2)</h3>
                   <form id="bigRoadsForm">
-                    <input type="file" id="sentinelFile" accept=".tif,.tiff" required />
-                    <button type="submit" class="action-btn">Run Extraction</button>
+                    <input
+                      type="file"
+                      id="sentinelFile"
+                      accept=".tif,.tiff"
+                      required
+                    />
+                    <button type="submit" class="action-btn">
+                      Run Extraction
+                    </button>
                   </form>
-                  <div id="bigRoadsStatus" style="margin:10px 0;color:#ff9800;"></div>
-                  <div id="bigRoadsResults" style="display:none;">
-                    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+                  <div
+                    id="bigRoadsStatus"
+                    style="margin: 10px 0; color: #ff9800"
+                  ></div>
+                  <div id="bigRoadsResults" style="display: none">
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap">
                       <div>
                         <h4>Original Image</h4>
-                        <div id="bigRoadsOrig" style="width:400px;height:400px;background:#222;"></div>
+                        <div
+                          id="bigRoadsOrig"
+                          style="width: 400px; height: 400px; background: #222"
+                        ></div>
                       </div>
                       <div>
                         <h4>Road Mask</h4>
-                        <div id="bigRoadsMask" style="width:400px;height:400px;background:#222;"></div>
+                        <div
+                          id="bigRoadsMask"
+                          style="width: 400px; height: 400px; background: #222"
+                        ></div>
                       </div>
                       <div>
                         <h4>Overlay Comparison</h4>
-                        <div id="bigRoadsOverlay" style="width:400px;height:400px;background:#222;"></div>
-                        <button id="toggleOverlayBtn" class="action-btn small" style="margin-top:10px;">Toggle Overlay</button>
+                        <div
+                          id="bigRoadsOverlay"
+                          style="width: 400px; height: 400px; background: #222"
+                        ></div>
+                        <button
+                          id="toggleOverlayBtn"
+                          class="action-btn small"
+                          style="margin-top: 10px"
+                        >
+                          Toggle Overlay
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -125,32 +185,40 @@
               </div>
             </div>
           </div>
-    <script>
-      // Tab switching logic for Analytics/Extract Big Roads
-      document.addEventListener('DOMContentLoaded', function() {
-        const analyticsTab = document.querySelector('.menu-item[data-section="analytics"]');
-        const bigroadsTab = document.querySelector('.menu-item[data-section="bigroads"]');
-        const analyticsFeatures = document.getElementById('analyticsFeatures');
-        const bigroadsSection = document.getElementById('bigroadsSection');
-        function showTab(tab) {
-          if (tab === 'analytics') {
-            analyticsTab.classList.add('active');
-            bigroadsTab.classList.remove('active');
-            analyticsFeatures.style.display = 'flex';
-            bigroadsSection.style.display = 'none';
-          } else {
-            analyticsTab.classList.remove('active');
-            bigroadsTab.classList.add('active');
-            analyticsFeatures.style.display = 'none';
-            bigroadsSection.style.display = 'block';
-          }
-        }
-        analyticsTab.addEventListener('click', () => showTab('analytics'));
-        bigroadsTab.addEventListener('click', () => showTab('bigroads'));
-        // Show analytics by default
-        showTab('analytics');
-      });
-    </script>
+          <script>
+            // Tab switching logic for Analytics/Extract Big Roads
+            document.addEventListener("DOMContentLoaded", function () {
+              const analyticsTab = document.querySelector(
+                '.menu-item[data-section="analytics"]'
+              );
+              const bigroadsTab = document.querySelector(
+                '.menu-item[data-section="bigroads"]'
+              );
+              const analyticsFeatures =
+                document.getElementById("analyticsFeatures");
+              const bigroadsSection =
+                document.getElementById("bigroadsSection");
+              function showTab(tab) {
+                if (tab === "analytics") {
+                  analyticsTab.classList.add("active");
+                  bigroadsTab.classList.remove("active");
+                  analyticsFeatures.style.display = "flex";
+                  bigroadsSection.style.display = "none";
+                } else {
+                  analyticsTab.classList.remove("active");
+                  bigroadsTab.classList.add("active");
+                  analyticsFeatures.style.display = "none";
+                  bigroadsSection.style.display = "block";
+                }
+              }
+              analyticsTab.addEventListener("click", () =>
+                showTab("analytics")
+              );
+              bigroadsTab.addEventListener("click", () => showTab("bigroads"));
+              // Show analytics by default
+              showTab("analytics");
+            });
+          </script>
         </div>
 
         <div class="bottom-panel">
@@ -181,6 +249,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <!-- For export -->
+    <script src="../config.js"></script>
     <script src="analysis.js"></script>
   </body>
 </html>
