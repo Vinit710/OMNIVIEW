@@ -255,29 +255,64 @@ body {
 .analytics-grid {
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap;
-
-  gap: 24px;
+  gap: 16px;
   width: 100%;
-  height: 100%;
-  align-items: stretch;
+  height: calc(100vh - 120px); /* leave room for top filters and bottom panel */
+  box-sizing: border-box;
 }
 
+/* Left: map area (primary) */
+.map-area {
+  flex: 2 1 0%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
-.map-card,
-    .charts-card {
-    background: #1c1c1c;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 196, 255, 0.2);
-    animation: fadeIn 1s ease-in-out;
-    flex: 1 1 100%;
-    min-width: 0;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
+/* Full map fills available space */
+.full-map {
+  flex: 1 1 0%;
+  min-height: 420px;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
 
+/* Right: results panel */
+.results-panel {
+  flex: 1 1 360px;
+  background: #171717;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+  color: #dfeffb;
+  overflow: hidden;
+}
 
+/* Toolbar above map */
+.map-toolbar {
+  display:flex;
+  gap:8px;
+  align-items:center;
+  padding:8px 0;
+}
+
+/* Small map controls */
+.map-mini-controls {
+  position: absolute;
+  top: 90px;
+  right: 20px;
+  z-index: 1000;
+}
+
+/* Keep buttons consistent */
+.action-btn.small { padding:6px 10px; font-size:13px; }
+
+/* Result blocks */
+.result-block { margin-bottom:16px; background:#111; padding:12px; border-radius:6px; border:1px solid #2b2b2b; }
+
+/* Make content-area scrollable and leave space for bottom-panel */
+.content-area { overflow:auto; padding-bottom: 120px; }
 
 @keyframes fadeIn {
   from {

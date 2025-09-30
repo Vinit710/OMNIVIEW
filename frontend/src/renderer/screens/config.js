@@ -20,6 +20,17 @@ const API_CONFIG = {
 };
 
 // Export for use in other files
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = API_CONFIG;
-}
+  // Also expose as a global so renderer scripts that expect a global `API_CONFIG`
+  // (loaded via <script> tags) will work without changes.
+  if (typeof globalThis !== "undefined") {
+    try {
+      globalThis.API_CONFIG = API_CONFIG;
+    } catch (e) {
+      // ignore in environments that disallow global assignment
+    }
+  }
+
+  // Keep CommonJS export for contexts that use require/module.exports
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = API_CONFIG;
+  }

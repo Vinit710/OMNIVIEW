@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener('DOMContentLoaded', () => {
   console.log("✅ Analytics screen loaded");
 
   const logsContent = document.querySelector(".logs-content");
@@ -77,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const formData = new FormData();
       formData.append("file", file);
       try {
-        const resp = await fetch(API_CONFIG.getUrl("EXTRACT_ROADS"), {
+        const resp = await fetch("http://localhost:5000/api/extract_roads", {
           method: "POST",
           body: formData,
         });
@@ -392,4 +392,170 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("click", () =>
       exportChart("disasterBarChart", "disasters.png")
     );
+
+  // -- interactive map + area analysis --
+  let  drawnLayer;
+  const mapEl = document.getElementById('map');
+  // initialize Leaflet map (reuse if already present)
+  const analysisMap = L.map('map').setView([20, 0], 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(analysisMap);
+
+  // FeatureGroup to store drawn items
+  // Reuse the already declared drawnItems
+  analysisMap.addLayer(drawnItems);
+
+  // Add draw control
+  drawControl = new L.Control.Draw({
+    draw: { marker:false, polyline:false, circle:false, rectangle:{}, circlemarker:false, polygon:{allowIntersection:false, showArea:true} },
+    edit: { featureGroup: drawnItems, remove:true }
+  });
+
+  // attach draw control only when requested
+  document.getElementById('drawBtn').addEventListener('click', () => {
+    if (!analysisMap.hasControl) {
+      analysisMap.addControl(drawControl);
+      analysisMap.hasControl = true;
+    }
+  });
+
+  document.getElementById('clearSelection').addEventListener('click', () => {
+    drawnItems.clearLayers();
+    document.getElementById('resultsContent').innerHTML = '<div id="summary" class="result-block">No area selected.</div>';
+    document.getElementById('fitToSelection').style.display = 'none';
+  });
+
+  analysisMap.on(L.Draw.Event.CREATED, function (event) {
+    const layer = event.layer;
+    drawnItems.clearLayers();
+    drawnItems.addLayer(layer);
+    const gj = layer.toGeoJSON();
+    analyzeSelection(gj, layer);
+  });
+
+  analysisMap.on('draw:edited', function(e) {
+    const layers = e.layers;
+    layers.eachLayer(function(l){
+      const gj = l.toGeoJSON();
+      analyzeSelection(gj, l);
+    });
+  });
+
+  async function analyzeSelection(geojson, layer) {
+    // compute area (m²) and perimeter (m)
+    const areaM2 = turf.area(geojson);
+    // perimeter: convert polygon to line
+    const line = turf.polygonToLine(geojson);
+    const perimeterKm = turf.length(line, {units: 'kilometers'});
+    const perimeterM = Math.round(perimeterKm * 1000);
+    const areaRounded = Math.round(areaM2);
+
+    // show basic summary
+    const summaryHtml = `
+      <div class="result-block">
+        <h4>Selection Summary</h4>
+        <p><strong>Area:</strong> ${areaRounded.toLocaleString()} m²</p>
+        <p><strong>Perimeter:</strong> ${perimeterM.toLocaleString()} m</p>
+      </div>
+    `;
+    document.getElementById('resultsContent').innerHTML = summaryHtml + '<div class="result-block">Loading landcover breakdown...</div>';
+    document.getElementById('fitToSelection').style.display = '';
+    // fit map to selection
+    if (layer && layer.getBounds) analysisMap.fitBounds(layer.getBounds(), {padding:[20,20]});
+
+    // Fetch landuse / natural / water features from Overpass within bbox
+    try {
+      const bbox = turf.bbox(geojson); // [minX, minY, maxX, maxY] => [west, south, east, north]
+      const south = bbox[1], west = bbox[0], north = bbox[3], east = bbox[2];
+      // Overpass QL: query landuse, natural, waterway
+      const q = `
+        [out:json][timeout:25];
+        (
+          way["landuse"](${south},${west},${north},${east});
+          relation["landuse"](${south},${west},${north},${east});
+          way["natural"](${south},${west},${north},${east});
+          relation["natural"](${south},${west},${north},${east});
+          way["water"](${south},${west},${north},${east});
+          relation["water"](${south},${west},${north},${east});
+        );
+        out geom;
+      `;
+      const url = 'https://overpass-api.de/api/interpreter';
+      const res = await fetch(url, { method:'POST', body: q });
+      if (!res.ok) throw new Error('Overpass fetch failed: ' + res.status);
+      const json = await res.json();
+      // convert elements to GeoJSON polygons where possible
+      const features = [];
+      for (const el of json.elements) {
+        if (!el.geometry) continue;
+        const coords = el.geometry.map(pt => [pt.lon, pt.lat]);
+        // create polygon if first and last not equal (attempt)
+        let geom = null;
+        if (el.type === 'way') {
+          // If closed, treat as polygon
+          if (coords.length >= 4 && coords[0][0] === coords[coords.length-1][0] && coords[0][1] === coords[coords.length-1][1]) {
+            geom = turf.polygon([coords], { tags: el.tags || {}});
+          } else {
+            // try polygon by closing
+            const closed = coords.concat([coords[0]]);
+            geom = turf.polygon([closed], { tags: el.tags || {}});
+          }
+        } else if (el.type === 'relation') {
+          // Build polygon from members not handled strictly; attempt using geometry as polygon
+          geom = turf.polygon([coords], { tags: el.tags || {}});
+        }
+        if (geom) features.push(geom);
+      }
+
+      // compute intersections and aggregate areas by tag
+      const breakdown = {};
+      let totalIntersectArea = 0;
+      for (const feat of features) {
+        try {
+          const inter = turf.intersect(geojson, feat);
+          if (!inter) continue;
+          const a = turf.area(inter);
+          totalIntersectArea += a;
+          const tag = (feat.properties.tags && (feat.properties.tags.landuse || feat.properties.tags.natural || feat.properties.tags.water)) || 'other';
+          breakdown[tag] = (breakdown[tag] || 0) + a;
+        } catch (err) {
+          console.warn('intersection error', err);
+        }
+      }
+
+      // water vs land heuristic
+      const waterArea = (breakdown.water || 0) + (breakdown.river || 0) + (breakdown.lake || 0);
+      const landArea = areaM2 - waterArea;
+
+      // prepare breakdown HTML
+      let breakdownHtml = '<div class="result-block"><h4>Landcover Breakdown (approx)</h4>';
+      breakdownHtml += `<p><strong>Computed overlap area:</strong> ${Math.round(totalIntersectArea).toLocaleString()} m² of ${areaRounded.toLocaleString()} m²</p>`;
+      breakdownHtml += '<ul>';
+      for (const k of Object.keys(breakdown).sort((a,b)=>breakdown[b]-breakdown[a])) {
+        const val = Math.round(breakdown[k]);
+        const pct = Math.round((val / areaRounded) * 10000)/100;
+        breakdownHtml += `<li><strong>${k}</strong>: ${val.toLocaleString()} m² (${pct}%)</li>`;
+      }
+      breakdownHtml += `</ul><p><strong>Estimated water area:</strong> ${Math.round(waterArea).toLocaleString()} m²</p>`;
+      breakdownHtml += `</div>`;
+
+      document.getElementById('resultsContent').innerHTML = summaryHtml + breakdownHtml;
+      // show raw geojson toggle
+      const raw = document.getElementById('rawGeojson');
+      raw.style.display = 'block';
+      raw.textContent = JSON.stringify(geojson, null, 2);
+    } catch (err) {
+      console.error(err);
+      document.getElementById('resultsContent').innerHTML = summaryHtml + `<div class="result-block error">Failed to load landcover data: ${err.message}</div>`;
+    }
+  }
+
+  // fit to selection button
+  document.getElementById('fitToSelection').addEventListener('click', () => {
+    const layers = drawnItems.getLayers();
+    if (!layers.length) return;
+    analysisMap.fitBounds(layers[0].getBounds(), {padding:[20,20]});
+  });
 });

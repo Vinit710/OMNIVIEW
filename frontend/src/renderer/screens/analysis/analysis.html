@@ -12,10 +12,14 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
     />
+    <!-- Turf for geospatial calculations -->
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <!-- Note: leaflet and draw scripts are loaded at bottom -->
     <link rel="stylesheet" href="analysis.css" />
   </head>
   <body>
     <div class="main-container">
+
       <div class="sidebar">
         <div class="sidebar-header">
           <div class="sidebar-title-container">
@@ -41,22 +45,16 @@
         </div>
         <div class="menu-section">
           <div class="menu-item active" data-section="analytics">
-            <button class="sidebar-btn">
-              <span class="item-icon">�</span> Analytics
-            </button>
+            <button class="sidebar-btn"><span class="item-icon">�</span> Analytics</button>
           </div>
           <div class="menu-item" data-section="bigroads">
-            <button class="sidebar-btn">
-              <span class="item-icon">🛣️</span> Extract Big Roads
-            </button>
+            <button class="sidebar-btn"><span class="item-icon">🛣️</span> Extract Big Roads</button>
           </div>
         </div>
       </div>
 
       <div class="content-container">
         <div class="content-area">
-          <!-- Default content removed for better layout -->
-
           <div id="analyticsContainer">
             <div class="filters">
               <label>
@@ -75,150 +73,126 @@
                 </select>
               </label>
             </div>
+            <!-- New layout: full-map left, results panel right -->
             <div class="analytics-grid">
-              <div
-                id="analyticsFeatures"
-                style="display: flex; flex-wrap: wrap; gap: 24px; width: 100%"
-              >
-                <div
-                  class="map-card"
-                  style="flex: 1 1 350px; min-width: 340px; max-width: 600px"
-                >
-                  <h3>🌍 Earth Observation Map</h3>
-                  <div id="map" style="height: 400px"></div>
-                  <button id="analyzeBtn" class="action-btn">
-                    Analyze Selected Area
-                  </button>
-                  <button id="ndviBtn" class="action-btn">Compute NDVI</button>
+              <div id="analyticsMapArea" class="map-area">
+                <div class="map-toolbar">
+                  <button id="drawBtn" class="action-btn small">Draw Area</button>
+                  <button id="clearSelection" class="action-btn small">Clear</button>
+                  <span id="mapHint" style="margin-left:12px;color:#bcd;">Draw polygon to analyze</span>
                 </div>
-                <div
-                  class="charts-card"
-                  style="flex: 1 1 350px; min-width: 340px; max-width: 600px"
-                >
-                  <h3>📈 Disaster Trends</h3>
-                  <input
-                    type="range"
-                    id="timeSlider"
-                    min="2019"
-                    max="2025"
-                    value="2025"
-                    style="width: 100%"
-                  />
-                  <canvas id="trendChart"></canvas>
-                  <button id="exportTrend" class="action-btn small">
-                    Export Chart
-                  </button>
-                </div>
-                <div
-                  class="charts-card"
-                  style="flex: 1 1 350px; min-width: 340px; max-width: 600px"
-                >
-                  <h3>🗺️ Land Classification</h3>
-                  <canvas id="classificationChart"></canvas>
-                </div>
-                <div
-                  class="charts-card"
-                  style="flex: 1 1 350px; min-width: 340px; max-width: 600px"
-                >
-                  <h3>⚠️ Disaster Types</h3>
-                  <canvas id="disasterBarChart"></canvas>
-                  <button id="exportBar" class="action-btn small">
-                    Export Chart
-                  </button>
+                <div id="map" class="full-map"></div>
+                <div class="map-mini-controls">
+                  <button id="fitToSelection" class="action-btn small" style="display:none;">Fit to selection</button>
                 </div>
               </div>
-              <div
-                class="bigroads-section"
-                id="bigroadsSection"
-                style="display: none"
-              >
-                <div class="charts-card">
-                  <h3>🛣️ Extract Big Roads (Sentinel-2)</h3>
-                  <form id="bigRoadsForm">
-                    <input
-                      type="file"
-                      id="sentinelFile"
-                      accept=".tif,.tiff"
-                      required
-                    />
-                    <button type="submit" class="action-btn">
-                      Run Extraction
-                    </button>
-                  </form>
-                  <div
-                    id="bigRoadsStatus"
-                    style="margin: 10px 0; color: #ff9800"
-                  ></div>
-                  <div id="bigRoadsResults" style="display: none">
-                    <div style="display: flex; gap: 20px; flex-wrap: wrap">
-                      <div>
-                        <h4>Original Image</h4>
-                        <div
-                          id="bigRoadsOrig"
-                          style="width: 400px; height: 400px; background: #222"
-                        ></div>
-                      </div>
-                      <div>
-                        <h4>Road Mask</h4>
-                        <div
-                          id="bigRoadsMask"
-                          style="width: 400px; height: 400px; background: #222"
-                        ></div>
-                      </div>
-                      <div>
-                        <h4>Overlay Comparison</h4>
-                        <div
-                          id="bigRoadsOverlay"
-                          style="width: 400px; height: 400px; background: #222"
-                        ></div>
-                        <button
-                          id="toggleOverlayBtn"
-                          class="action-btn small"
-                          style="margin-top: 10px"
-                        >
-                          Toggle Overlay
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+              <div id="analysisResults" class="results-panel">
+                <h3>Selection Results</h3>
+                <div id="resultsContent" style="overflow:auto; max-height:calc(100vh - 160px); padding-right:8px;">
+                  <div id="summary" class="result-block">No area selected.</div>
+                  <div id="landuseBreakdown" class="result-block"></div>
+                  <div id="rawGeojson" class="result-block" style="display:none;"></div>
                 </div>
               </div>
             </div>
+
+            <!-- Big Roads Extraction: explanatory content + upload form -->
+            <div id="bigroadsSection" class="bigroads-section" style="display:none; padding:20px;">
+              <h2 style="color:#ffb74d; margin:0 0 12px;">🛣️ Extract Big Roads (Sentinel-2)</h2>
+              <p style="color:#cfefff; max-width:900px; margin-bottom:12px;">
+                Use this feature to extract major road networks from Sentinel-2 satellite imagery.
+                Upload a GeoTIFF (Sentinel-2 or similar) and the AI model will generate:
+              </p>
+              <ul style="color:#bfe8ff; margin-top:0; margin-bottom:16px;">
+                <li>Original image (PNG preview)</li>
+                <li>Processed binary road mask (PNG)</li>
+                <li>Overlay image with detected roads highlighted</li>
+              </ul>
+              <p style="color:#d0eefc; max-width:900px; margin-bottom:18px;">
+                Notes: Large TIFFs can be sizable — processing may take several minutes depending on image resolution and your system. If you run into memory or timeout issues, try a smaller tile or run the model locally with the instructions in the README.
+              </p>
+
+              <form id="bigRoadsForm" style="display:flex; flex-direction:column; gap:12px; max-width:900px;">
+                <label style="color:#cfefff;">
+                  Select Sentinel-2 TIFF file:
+                  <input id="sentinelFile" type="file" accept=".tif,.tiff" style="display:block; margin-top:8px;"/>
+                </label>
+                <div style="display:flex; gap:12px; align-items:center;">
+                  <button id="runExtractionBtn" class="action-btn" type="submit">Run Extraction</button>
+                  <button id="toggleOverlayBtn" class="action-btn small" type="button">Toggle Overlay</button>
+                  <div id="bigRoadsStatus" style="color:#ffd; margin-left:12px;">Ready to upload</div>
+                </div>
+              </form>
+
+              <div id="bigRoadsResults" style="display:none; margin-top:18px; max-width:1100px;">
+                <h3 style="color:#ffd27a; margin-bottom:8px;">Results</h3>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                  <div style="flex:1 1 320px; min-width:280px; background:#1a1a1a; padding:8px; border-radius:8px;">
+                    <h4 style="margin:6px 0; color:#bfe8ff;">Original Image</h4>
+                    <div id="bigRoadsOrig" style="width:100%; height:300px; background:#0f0f0f; display:flex; align-items:center; justify-content:center; border-radius:6px;">
+                      <span style="color:#4b8; opacity:0.6;">No image</span>
+                    </div>
+                  </div>
+                  <div style="flex:1 1 320px; min-width:280px; background:#1a1a1a; padding:8px; border-radius:8px;">
+                    <h4 style="margin:6px 0; color:#bfe8ff;">Road Mask</h4>
+                    <div id="bigRoadsMask" style="width:100%; height:300px; background:#0f0f0f; display:flex; align-items:center; justify-content:center; border-radius:6px;">
+                      <span style="color:#ff8; opacity:0.6;">No mask</span>
+                    </div>
+                  </div>
+                  <div style="flex:1 1 320px; min-width:280px; background:#1a1a1a; padding:8px; border-radius:8px;">
+                    <h4 style="margin:6px 0; color:#bfe8ff;">Overlay</h4>
+                    <div id="bigRoadsOverlay" style="width:100%; height:300px; background:#0f0f0f; display:flex; align-items:center; justify-content:center; border-radius:6px;">
+                      <span style="color:#8cf; opacity:0.6;">No overlay</span>
+                    </div>
+                  </div>
+                </div>
+                <p style="color:#bcd; margin-top:12px; font-size:0.95rem;">
+                  You can right-click and save any result image. Use the Toggle Overlay button to adjust overlay visibility.
+                </p>
+              </div>
+            </div>
           </div>
-          <script>
-            // Tab switching logic for Analytics/Extract Big Roads
-            document.addEventListener("DOMContentLoaded", function () {
-              const analyticsTab = document.querySelector(
-                '.menu-item[data-section="analytics"]'
-              );
-              const bigroadsTab = document.querySelector(
-                '.menu-item[data-section="bigroads"]'
-              );
-              const analyticsFeatures =
-                document.getElementById("analyticsFeatures");
-              const bigroadsSection =
-                document.getElementById("bigroadsSection");
-              function showTab(tab) {
-                if (tab === "analytics") {
-                  analyticsTab.classList.add("active");
-                  bigroadsTab.classList.remove("active");
-                  analyticsFeatures.style.display = "flex";
-                  bigroadsSection.style.display = "none";
-                } else {
-                  analyticsTab.classList.remove("active");
-                  bigroadsTab.classList.add("active");
-                  analyticsFeatures.style.display = "none";
-                  bigroadsSection.style.display = "block";
-                }
-              }
-              analyticsTab.addEventListener("click", () =>
-                showTab("analytics")
-              );
-              bigroadsTab.addEventListener("click", () => showTab("bigroads"));
-              // Show analytics by default
-              showTab("analytics");
-            });
-          </script>
+    <script>
+      // Tab switching logic for Analytics/Extract Big Roads
+      document.addEventListener('DOMContentLoaded', function() {
+    const analyticsTab = document.querySelector('.menu-item[data-section="analytics"]');
+    const bigroadsTab = document.querySelector('.menu-item[data-section="bigroads"]');
+    const analyticsGrid = document.querySelector('.analytics-grid');
+    const bigroadsSection = document.getElementById('bigroadsSection');
+
+    function showTab(tab) {
+      // safely toggle visibility of the two sections
+      if (tab === 'analytics') {
+        analyticsTab && analyticsTab.classList.add('active');
+        bigroadsTab && bigroadsTab.classList.remove('active');
+        if (analyticsGrid) analyticsGrid.style.display = '';
+        if (bigroadsSection) bigroadsSection.style.display = 'none';
+      } else {
+        analyticsTab && analyticsTab.classList.remove('active');
+        bigroadsTab && bigroadsTab.classList.add('active');
+        if (analyticsGrid) analyticsGrid.style.display = 'none';
+        if (bigroadsSection) bigroadsSection.style.display = 'block';
+      }
+    }
+
+    function attachClick(el, tabName) {
+      if (!el) return;
+      el.addEventListener('click', function (e) {
+        e.preventDefault();
+        showTab(tabName);
+      });
+      // also make inner buttons propagate
+      const innerBtn = el.querySelector('button, .sidebar-btn');
+      if (innerBtn) innerBtn.addEventListener('click', (e) => { e.preventDefault(); el.click(); });
+    }
+
+    attachClick(analyticsTab, 'analytics');
+    attachClick(bigroadsTab, 'bigroads');
+
+    // Show analytics by default (only if sections exist)
+    showTab('analytics');
+  });
+</script>
         </div>
 
         <div class="bottom-panel">
@@ -249,7 +223,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <!-- For export -->
-    <script src="../config.js"></script>
     <script src="analysis.js"></script>
   </body>
 </html>
