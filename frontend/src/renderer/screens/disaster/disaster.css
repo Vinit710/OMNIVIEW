@@ -125,6 +125,10 @@ body {
   background: #2d2d2d;
 }
 
+.search-container.hidden {
+  display: none;
+}
+
 .search-box {
   display: flex;
   align-items: center;
@@ -558,7 +562,8 @@ body {
   border: none;
 }
 
-.pre-disaster-section, #preDisasterContent {
+.pre-disaster-section,
+#preDisasterContent {
   margin-top: 0 !important;
   padding-top: 0 !important;
 }

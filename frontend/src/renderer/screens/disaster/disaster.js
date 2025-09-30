@@ -93,23 +93,35 @@ function generateReport() {
         }))
     : addLog("error", "Please enter a search query to generate a report.");
 }
+const searchContainer = document.querySelector(".search-container");
 function loadDefaultContent() {
   ((isSearching = !1),
     (searchInput.value = ""),
     (defaultContent.style.display = "block"),
     (newsResults.style.display = "none"),
     (reportSection.style.display = "none"),
-    (postDisasterSection.style.display = "none"));
+    (postDisasterSection.style.display = "none"),
+    (preDisasterContent.style.display = "none"),
+    // Show search container for news section
+    searchContainer.classList.remove("hidden"));
 }
 function showNewsResults() {
   ((defaultContent.style.display = "none"),
     (newsResults.style.display = "block"),
-    (reportSection.style.display = "none"));
+    (reportSection.style.display = "none"),
+    (postDisasterSection.style.display = "none"),
+    (preDisasterContent.style.display = "none"),
+    // Show search container for news section
+    searchContainer.classList.remove("hidden"));
 }
 function showReportSection() {
   ((defaultContent.style.display = "none"),
     (newsResults.style.display = "none"),
-    (reportSection.style.display = "block"));
+    (reportSection.style.display = "block"),
+    (postDisasterSection.style.display = "none"),
+    (preDisasterContent.style.display = "none"),
+    // Show search container for report section
+    searchContainer.classList.remove("hidden"));
 }
 function showLoading() {
   resultsContainer.innerHTML =
@@ -166,11 +178,19 @@ function markdownToHtml(e) {
     .replace(/\n/g, "<br>");
 }
 function showPostDisaster() {
-  ((defaultContent.style.display = "none"),
-    (newsResults.style.display = "none"),
-    (reportSection.style.display = "none"),
-    (postDisasterSection.style.display = "block"),
-    mapInitialized || (initMap(), (mapInitialized = !0)));
+  defaultContent.style.display = "none";
+  newsResults.style.display = "none";
+  reportSection.style.display = "none";
+  postDisasterSection.style.display = "block";
+  preDisasterContent.style.display = "none";
+
+  // Hide search container
+  searchContainer.classList.add("hidden");
+
+  if (!mapInitialized) {
+    initMap();
+    mapInitialized = true;
+  }
 }
 function initMap() {
   (((map = L.map("map").setView([20, 0], 2)),
@@ -427,7 +447,11 @@ function showPreDisaster() {
   reportSection.style.display = "none";
   postDisasterSection.style.display = "none";
   preDisasterContent.style.display = "block";
-  document.getElementById("preWeatherHeadline").innerHTML = ""; // Clear headline on tab switch
+
+  // Hide search container
+  searchContainer.classList.add("hidden");
+
+  document.getElementById("preWeatherHeadline").innerHTML = "";
   if (!preDisasterMap) initPreDisasterMap();
 }
 
