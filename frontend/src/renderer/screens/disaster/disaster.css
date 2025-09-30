@@ -168,9 +168,9 @@ body {
 
 /* Content Area */
 .content-area {
-  flex: 1;
+  /* flex: 1; */
   overflow-y: auto;
-  padding-bottom: 140px; /* enough space for logs panel */
+  padding-bottom: 36px; /* enough space for logs panel */
 }
 
 .section-title {
