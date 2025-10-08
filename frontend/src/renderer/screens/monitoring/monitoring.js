@@ -1,13 +1,30 @@
+// Initialize speech synthesis
+const speechSynth = window.speechSynthesis;
+
+function speakText(text) {
+  // Cancel any ongoing speech
+  speechSynth.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.9;
+  utterance.pitch = 1;
+  speechSynth.speak(utterance);
+}
+
 function check_backend() {
   fetch("http://127.0.0.1:5000/api/status")
     .then((t) => t.json())
     .then((t) => {
-      document.getElementById("status").innerText = t.status;
+      const status = t.status;
+      document.getElementById("status").innerText = status;
+      // Speak the status update
+      speakText(status);
     })
     .catch((t) => {
-      ((document.getElementById("status").innerText =
-        "Backend not responding."),
-        console.error(t));
+      const errorMsg = "Backend not responding.";
+      document.getElementById("status").innerText = errorMsg;
+      speakText(errorMsg);
+      console.error(t);
     });
 }
 document.addEventListener("DOMContentLoaded", function () {

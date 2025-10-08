@@ -145,15 +145,25 @@ const {
   ];
 let mainWindow;
 function createWindow() {
-  ((mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    webPreferences: { nodeIntegration: !0, contextIsolation: !1 },
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
     icon: path.join(__dirname, "../assets/icon.png"),
-  })),
-    mainWindow.loadFile(
-      path.join(__dirname, "../renderer/screens/monitoring/monitoring.html")
-    ));
+  });
+
+  // Start with splash screen
+  mainWindow.loadFile(
+    path.join(__dirname, "../renderer/screens/splash/splash.html")
+  );
+
+  // After splash screen completes, restore window frame
+  mainWindow.once("ready-to-show", () => {
+    mainWindow.show();
+  });
   const e = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(e);
 }

@@ -1,143 +1,298 @@
+/* Complete futuristic hacker/sci-fi theme transformation */
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Share+Tech+Mono&display=swap");
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+/* Animated starfield background */
+@keyframes starfield {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-2000px);
+  }
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes glitch {
+  0%,
+  100% {
+    transform: translate(0);
+  }
+  20% {
+    transform: translate(-2px, 2px);
+  }
+  40% {
+    transform: translate(-2px, -2px);
+  }
+  60% {
+    transform: translate(2px, 2px);
+  }
+  80% {
+    transform: translate(2px, -2px);
+  }
+}
+
+@keyframes neon-glow {
+  0%,
+  100% {
+    text-shadow:
+      0 0 10px #00ff41,
+      0 0 20px #00ff41,
+      0 0 30px #00ff41;
+    filter: brightness(1);
+  }
+  50% {
+    text-shadow:
+      0 0 20px #00ff41,
+      0 0 30px #00ff41,
+      0 0 40px #00ff41,
+      0 0 50px #00ff41;
+    filter: brightness(1.3);
+  }
+}
+
+@keyframes pulse-border {
+  0%,
+  100% {
+    box-shadow:
+      0 0 5px #00ff41,
+      inset 0 0 5px #00ff4133;
+  }
+  50% {
+    box-shadow:
+      0 0 20px #00ff41,
+      0 0 30px #00ff4166,
+      inset 0 0 10px #00ff4166;
+  }
+}
+
+@keyframes data-stream {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes hologram-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: #1a1a1a;
-  color: white;
+  font-family: "Orbitron", "Share Tech Mono", monospace;
+  background: #000814;
+  color: #00ff41;
   overflow: hidden;
+  position: relative;
 }
 
-/* Title Bar */
-.title-bar {
-  height: 32px;
-  background: #2d2d2d;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  -webkit-app-region: drag;
-  border-bottom: 1px solid #3d3d3d;
+/* Starfield background effect */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 200%;
+  background-image:
+    radial-gradient(2px 2px at 20% 30%, #00ff41, transparent),
+    radial-gradient(2px 2px at 60% 70%, #0ff, transparent),
+    radial-gradient(1px 1px at 50% 50%, #fff, transparent),
+    radial-gradient(1px 1px at 80% 10%, #00ff41, transparent),
+    radial-gradient(2px 2px at 90% 60%, #0ff, transparent),
+    radial-gradient(1px 1px at 33% 80%, #fff, transparent);
+  background-size: 200% 200%;
+  animation: starfield 200s linear infinite;
+  opacity: 0.3;
+  z-index: 0;
+  pointer-events: none;
 }
 
-.app-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.app-icon {
-  width: 16px;
-  height: 16px;
-  background: #00a8e8;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-}
-
-.window-controls {
-  display: flex;
-  gap: 8px;
-  -webkit-app-region: no-drag;
-}
-
-.control-btn {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: none;
-  cursor: pointer;
-}
-
-.minimize {
-  background: #ffbd2e;
-}
-.maximize {
-  background: #28ca42;
-}
-.close {
-  background: #ff5f56;
-}
-
-/* Menu Bar */
-.menu-bar {
-  height: 28px;
-  background: #2d2d2d;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  border-bottom: 1px solid #3d3d3d;
-  font-size: 13px;
-}
-
-.menu-item {
-  padding: 4px 12px;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.menu-item:hover {
-  background: #3d3d3d;
+/* Scanline effect overlay */
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(transparent, #00ff4166, transparent);
+  animation: scanline 8s linear infinite;
+  z-index: 9999;
+  pointer-events: none;
 }
 
 /* Main Container */
 .main-container {
   display: flex;
   height: 100vh;
+  position: relative;
+  z-index: 1;
 }
 
-/* Sidebar */
+/* Futuristic sidebar with glowing borders */
+.sidebar {
+  width: 280px;
+  background: linear-gradient(180deg, #001233 0%, #000814 100%);
+  border-right: 2px solid #00ff41;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow:
+    0 0 30px #00ff4133,
+    inset 0 0 30px #00ff4111;
+  animation: pulse-border 3s ease-in-out infinite;
+}
 
-/* Screen Dropdown Styles - ADD THESE TO YOUR main.css */
+/* Animated corner accents */
+.sidebar::before,
+.sidebar::after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #00ff41;
+  z-index: 10;
+}
+
+.sidebar::before {
+  top: 0;
+  left: 0;
+  border-right: none;
+  border-bottom: none;
+  box-shadow: -5px -5px 10px #00ff4166;
+}
+
+.sidebar::after {
+  bottom: 0;
+  left: 0;
+  border-right: none;
+  border-top: none;
+  box-shadow: -5px 5px 10px #00ff4166;
+}
+
+.sidebar-header {
+  padding: 25px 20px;
+  border-bottom: 2px solid #00ff4133;
+  position: relative;
+  z-index: 1002;
+  background: linear-gradient(90deg, #001a3366, transparent);
+}
+
 .sidebar-title-container {
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 6px;
-  transition: background 0.2s;
+  padding: 12px 16px;
+  border-radius: 8px;
+  transition: all 0.3s;
   user-select: none;
+  background: linear-gradient(135deg, #001a33, #000814);
+  border: 1px solid #00ff4133;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Holographic hover effect */
+.sidebar-title-container::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, #00ff4122, transparent);
+  transform: rotate(45deg);
+  transition: all 0.5s;
+}
+
+.sidebar-title-container:hover::before {
+  left: 100%;
 }
 
 .sidebar-title-container:hover {
-  background: #3d3d3d;
-  /* padding: 8px 12px;
-  margin: -8px -12px; */
+  background: linear-gradient(135deg, #002244, #001122);
+  box-shadow:
+    0 0 20px #00ff4166,
+    inset 0 0 20px #00ff4111;
+  transform: translateX(5px);
+}
+
+.sidebar-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  animation: neon-glow 2s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+}
+
+.active-screen {
+  color: #00ff41;
+  text-shadow:
+    0 0 10px #00ff41,
+    0 0 20px #00ff41;
 }
 
 .dropdown-arrow {
-  font-size: 12px;
-  color: #888;
-  transition: transform 0.2s;
+  font-size: 14px;
+  color: #00ff41;
+  transition:
+    transform 0.3s,
+    filter 0.3s;
+  filter: drop-shadow(0 0 5px #00ff41);
 }
 
 .dropdown-arrow.rotated {
   transform: rotate(180deg);
+  filter: drop-shadow(0 0 10px #00ff41);
 }
 
+/* Futuristic dropdown with glass morphism */
 .screen-dropdown {
   position: absolute;
   top: calc(100% - 10px);
   left: 20px;
   right: 20px;
-  background: #2d2d2d;
-  border: 1px solid #3d3d3d;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #001a3399, #00081499);
+  backdrop-filter: blur(10px);
+  border: 2px solid #00ff4166;
+  border-radius: 12px;
+  box-shadow:
+    0 8px 32px #00000066,
+    0 0 20px #00ff4133;
   z-index: 1002;
   opacity: 0;
   visibility: hidden;
-  transform: translateY(-10px);
-  transition: all 0.2s ease-in-out;
+  transform: translateY(-20px);
+  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 .screen-dropdown.show {
@@ -149,420 +304,590 @@ body {
 .dropdown-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 15px;
+  padding: 14px 18px;
   cursor: pointer;
-  transition: background 0.2s;
-  border-radius: 4px;
-  margin: 4px;
+  transition: all 0.3s;
+  border-radius: 8px;
+  margin: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Data stream effect on hover */
+.dropdown-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, #00ff4133, transparent);
+  transition: left 0.5s;
+}
+
+.dropdown-item:hover::before {
+  left: 100%;
 }
 
 .dropdown-item:hover {
-  background: #3d3d3d;
+  background: linear-gradient(90deg, #002244, #001a33);
+  transform: translateX(8px);
+  box-shadow: 0 0 15px #00ff4133;
 }
 
 .dropdown-item.active {
-  background: #1e3a5f;
-  color: #64b5f6;
+  background: linear-gradient(90deg, #003355, #002244);
+  color: #00ff41;
+  box-shadow:
+    0 0 20px #00ff4166,
+    inset 0 0 10px #00ff4122;
 }
 
 .dropdown-icon {
-  width: 20px;
-  height: 20px;
-  background: #4a4a4a;
-  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #001a33, #003355);
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 14px;
+  border: 1px solid #00ff4133;
+  box-shadow: 0 0 10px #00ff4133;
 }
 
-.active-screen {
-  color: #64b5f6;
-}
-
-/* Make sidebar header relative for dropdown positioning */
-.sidebar-header {
-  padding: 20px;
-  border-bottom: 1px solid #3d3d3d;
-  position: relative;
-  z-index: 1002; /* Increase z-index to ensure dropdown shows above map */
-}
-
-.sidebar {
-  width: 250px;
-  background: #2d2d2d;
-  border-right: 1px solid #3d3d3d;
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar-header {
-  padding: 20px;
-  border-bottom: 1px solid #3d3d3d;
-}
-
-.sidebar-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  letter-spacing: 0.5px;
-}
-
+/* Monitoring section with animated items */
 .monitoring-section {
   flex: 1;
-  padding: 20px;
+  padding: 25px 20px;
+  overflow-y: auto;
+}
+
+.monitoring-section::-webkit-scrollbar {
+  width: 8px;
+}
+
+.monitoring-section::-webkit-scrollbar-track {
+  background: #001233;
+  border-radius: 10px;
+}
+
+.monitoring-section::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #00ff41, #0ff);
+  border-radius: 10px;
+  box-shadow: 0 0 10px #00ff41;
 }
 
 .monitoring-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  margin-bottom: 8px;
-  border-radius: 6px;
+  gap: 15px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s;
+  background: linear-gradient(90deg, #001a3366, transparent);
+  border: 1px solid #00ff4122;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Animated border effect */
+.monitoring-item::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #00ff41, #0ff);
+  transition: width 0.4s;
+  box-shadow: 0 0 10px #00ff41;
+}
+
+.monitoring-item:hover::after {
+  width: 100%;
 }
 
 .monitoring-item:hover {
-  background: #3d3d3d;
+  background: linear-gradient(90deg, #002244, #001a33);
+  transform: translateX(10px);
+  box-shadow: 0 0 20px #00ff4133;
 }
 
 .monitoring-item.active {
-  background: #1e3a5f;
-  color: #64b5f6;
+  background: linear-gradient(90deg, #003355, #002244);
+  color: #00ff41;
+  box-shadow:
+    0 0 25px #00ff4166,
+    inset 0 0 15px #00ff4122;
+  border: 1px solid #00ff41;
+}
+
+.monitoring-item.active::after {
+  width: 100%;
 }
 
 .item-icon {
-  width: 20px;
-  height: 20px;
-  background: #4a4a4a;
-  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #001a33, #003355);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 16px;
+  border: 1px solid #00ff4133;
+  box-shadow: 0 0 10px #00ff4133;
+  transition: all 0.3s;
 }
 
+.monitoring-item:hover .item-icon,
+.monitoring-item.active .item-icon {
+  box-shadow: 0 0 20px #00ff41;
+  transform: scale(1.1) rotate(5deg);
+}
+
+/* Futuristic analyze button with pulse effect */
 .analyze-btn {
   margin: 20px;
-  padding: 12px 24px;
-  background: #00a8e8;
-  color: white;
+  padding: 16px 28px;
+  background: linear-gradient(135deg, #00ff41, #00cc33);
+  color: #000814;
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  box-shadow:
+    0 0 20px #00ff4166,
+    0 5px 15px #00000066;
+  position: relative;
+  overflow: hidden;
+}
+
+.analyze-btn::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%);
+  transition:
+    width 0.6s,
+    height 0.6s;
+}
+
+.analyze-btn:hover::before {
+  width: 300px;
+  height: 300px;
 }
 
 .analyze-btn:hover {
-  background: #0089c7;
+  background: linear-gradient(135deg, #00ff41, #00ff88);
+  box-shadow:
+    0 0 40px #00ff41,
+    0 0 60px #00ff4166;
+  transform: translateY(-3px);
 }
 
-/* Map Container */
+.analyze-btn:active {
+  transform: translateY(0);
+}
+
+/* Map container with holographic effect */
 .map-container {
   flex: 1;
   position: relative;
-  background: #1a1a1a;
+  background: linear-gradient(135deg, #000814, #001233);
+  border: 2px solid #00ff4133;
+  box-shadow: inset 0 0 50px #00ff4111;
 }
 
+/* Futuristic search container */
 .search-container {
   position: absolute;
-  top: 20px;
-  left: 20px;
+  top: 25px;
+  left: 25px;
   z-index: 1000;
   display: flex;
   align-items: center;
-  background: white;
-  border-radius: 25px;
-  padding: 8px 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(135deg, #001a3399, #00081499);
+  backdrop-filter: blur(10px);
+  border-radius: 30px;
+  padding: 10px 20px;
+  box-shadow:
+    0 8px 32px #00000066,
+    0 0 20px #00ff4133;
+  border: 2px solid #00ff4166;
+  transition: all 0.3s;
+}
+
+.search-container:hover {
+  box-shadow:
+    0 8px 32px #00000099,
+    0 0 30px #00ff4166;
+  transform: translateY(-2px);
 }
 
 .search-input {
   border: none;
   outline: none;
-  padding: 4px 8px;
+  padding: 8px 12px;
   font-size: 14px;
-  width: 200px;
+  width: 250px;
+  background: transparent;
+  color: #00ff41;
+  font-family: "Share Tech Mono", monospace;
+}
+
+.search-input::placeholder {
+  color: #00ff4166;
 }
 
 .search-icon {
-  color: #666;
-  margin-left: 8px;
+  color: #00ff41;
+  margin-left: 10px;
+  filter: drop-shadow(0 0 5px #00ff41);
+  animation: neon-glow 2s ease-in-out infinite;
 }
 
-/* Map Tools */
+/* Futuristic map tools */
 .map-tools {
   position: absolute;
-  top: 80px;
-  right: 20px;
+  top: 100px;
+  right: 25px;
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .tool-btn {
-  width: 40px;
-  height: 40px;
-  background: white;
-  border: none;
-  border-radius: 6px;
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, #001a3399, #00081499);
+  backdrop-filter: blur(10px);
+  border: 2px solid #00ff4166;
+  border-radius: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  font-size: 16px;
+  box-shadow:
+    0 4px 15px #00000066,
+    0 0 15px #00ff4133;
+  font-size: 20px;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.tool-btn::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: #00ff4133;
+  transform: translate(-50%, -50%);
+  transition:
+    width 0.4s,
+    height 0.4s;
+}
+
+.tool-btn:hover::before {
+  width: 100px;
+  height: 100px;
 }
 
 .tool-btn:hover {
-  background: #f5f5f5;
+  background: linear-gradient(135deg, #002244, #001a33);
+  box-shadow:
+    0 4px 20px #00000099,
+    0 0 25px #00ff4166;
+  transform: scale(1.1) rotate(5deg);
+  border-color: #00ff41;
 }
 
-/* Coordinates Display */
+/* Layer control buttons */
+.map-layer-controls {
+  position: absolute;
+  top: 25px;
+  right: 25px;
+  z-index: 1000;
+  display: flex;
+  gap: 12px;
+}
+
+.layer-btn {
+  background: linear-gradient(135deg, #001a3399, #00081499);
+  backdrop-filter: blur(10px);
+  color: #00ff41;
+  border: 2px solid #00ff4166;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow:
+    0 4px 15px #00000066,
+    0 0 15px #00ff4133;
+  transition: all 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-family: "Orbitron", monospace;
+}
+
+.layer-btn:hover {
+  background: linear-gradient(135deg, #002244, #001a33);
+  box-shadow:
+    0 4px 20px #00000099,
+    0 0 25px #00ff4166;
+  transform: translateY(-2px);
+}
+
+.layer-btn.active {
+  background: linear-gradient(135deg, #00ff41, #00cc33);
+  color: #000814;
+  border-color: #00ff41;
+  box-shadow:
+    0 0 30px #00ff41,
+    0 0 50px #00ff4166;
+}
+
+/* Coordinates display with matrix effect */
 .coordinates {
   position: absolute;
-  bottom: 124px;
-  right: 20px;
+  bottom: 140px;
+  right: 25px;
   z-index: 1000;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-family: monospace;
+  background: linear-gradient(135deg, #001a3399, #00081499);
+  backdrop-filter: blur(10px);
+  color: #00ff41;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: "Share Tech Mono", monospace;
+  border: 2px solid #00ff4166;
+  box-shadow:
+    0 4px 15px #00000066,
+    0 0 15px #00ff4133;
+  animation: hologram-flicker 3s ease-in-out infinite;
 }
 
-/* Bottom Panel */
+/* Futuristic bottom panel */
 .bottom-panel {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 120px;
-  background: rgba(26, 26, 26, 0.95);
-  border-top: 1px solid #3d3d3d;
+  height: 140px;
+  background: linear-gradient(180deg, #00081499, #001233cc);
+  backdrop-filter: blur(10px);
+  border-top: 2px solid #00ff4166;
   z-index: 1000;
+  box-shadow:
+    0 -5px 30px #00000066,
+    0 0 20px #00ff4111;
+  transition: height 0.3s;
 }
 
 .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 16px;
-  border-bottom: 1px solid #3d3d3d;
+  padding: 12px 20px;
+  border-bottom: 1px solid #00ff4133;
+  background: linear-gradient(90deg, #001a3366, transparent);
 }
 
 .panel-title {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
+  color: #00ff41;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px #00ff41;
 }
 
 .expand-btn {
-  background: #3d3d3d;
-  color: white;
-  border: none;
-  padding: 4px 8px;
-  border-radius: 4px;
+  background: linear-gradient(135deg, #001a33, #003355);
+  color: #00ff41;
+  border: 1px solid #00ff4166;
+  padding: 6px 14px;
+  border-radius: 6px;
   font-size: 12px;
   cursor: pointer;
+  transition: all 0.3s;
+  text-transform: uppercase;
+  font-weight: 600;
+  box-shadow: 0 0 10px #00ff4133;
 }
 
-/* Enhanced log styles */
-.log-info {
-  color: #64b5f6;
+.expand-btn:hover {
+  background: linear-gradient(135deg, #002244, #004466);
+  box-shadow: 0 0 20px #00ff4166;
+  transform: scale(1.05);
 }
 
-.log-success {
-  color: #4caf50;
-}
-
-.log-warning {
-  color: #ffa726;
-}
-
-.log-error {
-  color: #ef5350;
-}
-
-.log-timestamp {
-  color: #888;
-  font-size: 11px;
-}
-
+/* Enhanced log styles with color coding */
 .logs-content {
-  padding: 12px 16px;
-  font-size: 12px;
-  font-family: monospace;
-  line-height: 1.4;
-  max-height: calc(100% - 40px);
+  padding: 15px 20px;
+  font-size: 13px;
+  font-family: "Share Tech Mono", monospace;
+  line-height: 1.6;
+  max-height: calc(100% - 50px);
   overflow-y: auto;
 }
 
-/* Scrollbar styling for logs */
 .logs-content::-webkit-scrollbar {
   width: 6px;
 }
 
 .logs-content::-webkit-scrollbar-track {
-  background: #2d2d2d;
+  background: #001233;
 }
 
 .logs-content::-webkit-scrollbar-thumb {
-  background: #555;
-  border-radius: 3px;
+  background: linear-gradient(180deg, #00ff41, #0ff);
+  border-radius: 10px;
+  box-shadow: 0 0 10px #00ff41;
 }
 
-.logs-content::-webkit-scrollbar-thumb:hover {
-  background: #666;
+.log-info {
+  color: #0ff;
+  text-shadow: 0 0 5px #0ff;
+}
+
+.log-success {
+  color: #00ff41;
+  text-shadow: 0 0 5px #00ff41;
+}
+
+.log-warning {
+  color: #ffaa00;
+  text-shadow: 0 0 5px #ffaa00;
+}
+
+.log-error {
+  color: #ff0055;
+  text-shadow: 0 0 5px #ff0055;
+}
+
+.log-timestamp {
+  color: #00ff4166;
+  font-size: 11px;
 }
 
 /* Map */
 #map {
   width: 100%;
   height: 100%;
+  filter: hue-rotate(10deg) saturate(1.2);
 }
 
-/* Uncomment and modify the Leaflet control styles */
+/* Leaflet control customization */
 .leaflet-left .leaflet-control {
-  /* position: absolute; */
-  margin-left: calc(100vw - 310px); /* Position from left */
+  margin-left: calc(100vw - 330px);
 }
 
 .leaflet-top .leaflet-control {
   position: absolute;
-  margin-top: calc(100vh - 250px);
+  margin-top: calc(100vh - 270px);
 }
 
-/* Add these new styles */
 .leaflet-control-zoom {
   border: none !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  box-shadow:
+    0 4px 15px #00000066,
+    0 0 15px #00ff4133 !important;
 }
 
 .leaflet-control-zoom-in,
 .leaflet-control-zoom-out {
-  background: white !important;
-  width: 40px !important;
-  height: 40px !important;
-  line-height: 40px !important;
-  border-radius: 6px !important;
-  color: #333 !important;
-  font-size: 16px !important;
-  margin-bottom: 8px !important;
+  background: linear-gradient(135deg, #001a3399, #00081499) !important;
+  backdrop-filter: blur(10px) !important;
+  width: 45px !important;
+  height: 45px !important;
+  line-height: 45px !important;
+  border-radius: 10px !important;
+  color: #00ff41 !important;
+  font-size: 18px !important;
+  margin-bottom: 10px !important;
+  border: 2px solid #00ff4166 !important;
+  transition: all 0.3s !important;
 }
 
 .leaflet-control-zoom-in:hover,
 .leaflet-control-zoom-out:hover {
-  background: #f5f5f5 !important;
+  background: linear-gradient(135deg, #002244, #001a33) !important;
+  box-shadow: 0 0 25px #00ff4166 !important;
+  transform: scale(1.1) !important;
 }
 
-/* News Panel Styling */
-#newsPanel {
-  background: #222 !important;
-  color: #fff !important;
-}
-
-#newsPanel input,
-#newsPanel button {
-  color: #222;
-  background: #fff;
-  border: 1px solid #888;
-}
-
-#newsPanel h2 {
-  color: #fff;
-}
-
-.news-article h3 {
-  color: #ffd700;
-}
-
-.news-article a {
-  color: #00bfff;
-}
-/* Map Layer Switch Buttons - Bottom Left */
-
-.map-layer-controls {
-  position: absolute;
-  top: 20px; /* adjust as needed to appear below map-tools */
-  right: 20px;
-  z-index: 1000;
-  display: flex;
-  gap: 8px;
-  margin-top: 0;
-  justify-content: flex-start;
-}
-
-.layer-btn {
-  background: rgba(55, 79, 219, 0.938);
-  color: #333;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 14px;
-  font-size: 14px;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition:
-    background 0.2s,
-    color 0.2s;
-}
-
-.layer-btn:hover {
-  background: #f5f5f5;
-}
-
-.layer-btn.active {
-  background: #00a8e8;
-  color: white;
-}
-
-/* New Area Control Styles */
+/* Area control styling */
 .area-control {
   position: fixed;
-  bottom: 120px; /* Position above the bottom panel */
-  left: 300px; /* Position to the right of the sidebar */
-  background: #222;
-  color: white;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  bottom: 140px;
+  left: 320px;
+  background: linear-gradient(135deg, #001a3399, #00081499);
+  backdrop-filter: blur(10px);
+  color: #00ff41;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow:
+    0 8px 32px #00000066,
+    0 0 20px #00ff4133;
   z-index: 1000;
+  border: 2px solid #00ff4166;
 }
 
 .area-control input {
-  background: #333;
-  color: white;
-  border: 1px solid #444;
-  border-radius: 4px;
-  padding: 5px;
-  margin: 5px 0;
+  background: linear-gradient(135deg, #001233, #001a33);
+  color: #00ff41;
+  border: 1px solid #00ff4166;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-family: "Share Tech Mono", monospace;
+  box-shadow: inset 0 0 10px #00ff4111;
 }
 
 .area-control button {
-  background: #00a8e8;
-  color: white;
+  background: linear-gradient(135deg, #00ff41, #00cc33);
+  color: #000814;
   border: none;
-  padding: 8px 15px;
-  margin: 5px;
-  border-radius: 4px;
+  padding: 10px 18px;
+  margin: 8px 5px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s;
+  font-weight: 600;
+  text-transform: uppercase;
+  box-shadow: 0 0 15px #00ff4133;
 }
 
 .area-control button:hover {
-  background: #0086ba;
+  box-shadow: 0 0 25px #00ff41;
+  transform: translateY(-2px);
 }
 
 #cancelAreaBtn {
-  background: #666;
+  background: linear-gradient(135deg, #ff0055, #cc0044);
+  color: #fff;
 }
 
 #cancelAreaBtn:hover {
-  background: #555;
+  box-shadow: 0 0 25px #ff0055;
 }
