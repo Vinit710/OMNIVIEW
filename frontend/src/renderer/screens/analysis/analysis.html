@@ -43,14 +43,30 @@
             </div>
           </div>
         </div>
-        <div class="menu-section">
-          <div class="menu-item active" data-section="analytics">
-            <button class="sidebar-btn"><span class="item-icon">�</span> Analytics</button>
+        <div class="analytics-section">
+          <div class="analytics-item active" data-section="analytics">
+            <div class="item-icon">📊</div>
+            <span>Area Analysis</span>
           </div>
-          <div class="menu-item" data-section="bigroads">
-            <button class="sidebar-btn"><span class="item-icon">🛣️</span> Extract Big Roads</button>
+          <div class="analytics-item" data-section="trends">
+            <div class="item-icon">📈</div>
+            <span>Trends</span>
+          </div>
+          <div class="analytics-item" data-section="classification">
+            <div class="item-icon">🗺️</div>
+            <span>Classification</span>
+          </div>
+          <div class="analytics-item" data-section="ndvi">
+            <div class="item-icon">🌿</div>
+            <span>NDVI Analysis</span>
+          </div>
+          <div class="analytics-item" data-section="bigroads">
+            <div class="item-icon">🛣️</div>
+            <span>Road Extraction</span>
           </div>
         </div>
+
+        <button class="analyze-btn">Start Analysis</button>
       </div>
 
       <div class="content-container">
@@ -152,47 +168,7 @@
               </div>
             </div>
           </div>
-    <script>
-      // Tab switching logic for Analytics/Extract Big Roads
-      document.addEventListener('DOMContentLoaded', function() {
-    const analyticsTab = document.querySelector('.menu-item[data-section="analytics"]');
-    const bigroadsTab = document.querySelector('.menu-item[data-section="bigroads"]');
-    const analyticsGrid = document.querySelector('.analytics-grid');
-    const bigroadsSection = document.getElementById('bigroadsSection');
 
-    function showTab(tab) {
-      // safely toggle visibility of the two sections
-      if (tab === 'analytics') {
-        analyticsTab && analyticsTab.classList.add('active');
-        bigroadsTab && bigroadsTab.classList.remove('active');
-        if (analyticsGrid) analyticsGrid.style.display = '';
-        if (bigroadsSection) bigroadsSection.style.display = 'none';
-      } else {
-        analyticsTab && analyticsTab.classList.remove('active');
-        bigroadsTab && bigroadsTab.classList.add('active');
-        if (analyticsGrid) analyticsGrid.style.display = 'none';
-        if (bigroadsSection) bigroadsSection.style.display = 'block';
-      }
-    }
-
-    function attachClick(el, tabName) {
-      if (!el) return;
-      el.addEventListener('click', function (e) {
-        e.preventDefault();
-        showTab(tabName);
-      });
-      // also make inner buttons propagate
-      const innerBtn = el.querySelector('button, .sidebar-btn');
-      if (innerBtn) innerBtn.addEventListener('click', (e) => { e.preventDefault(); el.click(); });
-    }
-
-    attachClick(analyticsTab, 'analytics');
-    attachClick(bigroadsTab, 'bigroads');
-
-    // Show analytics by default (only if sections exist)
-    showTab('analytics');
-  });
-</script>
         </div>
 
         <div class="bottom-panel">
