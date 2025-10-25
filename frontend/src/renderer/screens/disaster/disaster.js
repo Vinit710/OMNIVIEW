@@ -104,6 +104,9 @@ function loadDefaultContent() {
     (preDisasterContent.style.display = "none"),
     // Show search container for news section
     searchContainer.classList.remove("hidden"));
+
+  // Show content area for default/news content
+  document.querySelector(".content-area").style.display = "block";
 }
 function showNewsResults() {
   ((defaultContent.style.display = "none"),
@@ -113,6 +116,9 @@ function showNewsResults() {
     (preDisasterContent.style.display = "none"),
     // Show search container for news section
     searchContainer.classList.remove("hidden"));
+
+  // Show content area for news results
+  document.querySelector(".content-area").style.display = "block";
 }
 function showReportSection() {
   ((defaultContent.style.display = "none"),
@@ -122,6 +128,9 @@ function showReportSection() {
     (preDisasterContent.style.display = "none"),
     // Show search container for report section
     searchContainer.classList.remove("hidden"));
+
+  // Show content area for report section
+  document.querySelector(".content-area").style.display = "block";
 }
 function showLoading() {
   resultsContainer.innerHTML =
@@ -186,6 +195,9 @@ function showPostDisaster() {
 
   // Hide search container
   searchContainer.classList.add("hidden");
+
+  // Show content area for post-disaster
+  document.querySelector(".content-area").style.display = "block";
 
   if (!mapInitialized) {
     initMap();
@@ -448,6 +460,9 @@ function showPreDisaster() {
   // Hide search container
   searchContainer.classList.add("hidden");
 
+  // Hide content area for pre-disaster
+  document.querySelector(".content-area").style.display = "none";
+
   document.getElementById("preWeatherHeadline").innerHTML = "";
   if (!preDisasterMap) initPreDisasterMap();
 }
@@ -455,6 +470,9 @@ function showPreDisaster() {
 function hidePreDisaster() {
   preDisasterContent.style.display = "none";
   document.getElementById("preWeatherHeadline").innerHTML = "";
+
+  // Show content area when leaving pre-disaster
+  document.querySelector(".content-area").style.display = "block";
 }
 
 function initPreDisasterMap() {
