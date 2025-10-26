@@ -27,6 +27,8 @@ from road_backend import road_bp
 from services.flight_data import start_flight_tracker, get_flights_data
 # Import the big roads extraction blueprint
 from road_extract import road_extract_bp
+# Import the change detection service
+from change_detection import detect_building_changes
 
 # Load environment variables
 load_dotenv()
@@ -1123,6 +1125,49 @@ def analyze_disasters():
     except Exception as e:
         app.logger.error(f"Disaster analysis failed: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/building-change-detection', methods=['POST'])
+def building_change_detection():
+    """Built-up change detection endpoint"""
+    try:
+        app.logger.info("🏢 Building change detection request received")
+        
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        pre_image = data.get('pre_image')
+        post_image = data.get('post_image')
+        
+        if not pre_image or not post_image:
+            return jsonify({"error": "Both pre and post images are required"}), 400
+        
+        app.logger.info("Processing change detection...")
+        
+        # Run change detection
+        result = detect_building_changes(pre_image, post_image)
+        
+        if result.get("error"):
+            app.logger.error(f"Change detection failed: {result['error']}")
+            return jsonify(result), 500
+        
+        app.logger.info(f"✅ Change detection completed. Change percentage: {result.get('change_percentage', 0)}%")
+        
+        return jsonify({
+            "status": "success",
+            "message": "Built-up change detection completed successfully",
+            "result": result,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Building change detection error: {e}")
+        app.logger.error(traceback.format_exc())
+        return jsonify({
+            "error": "Change detection processing failed",
+            "details": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
 
 
 if __name__ == "__main__":

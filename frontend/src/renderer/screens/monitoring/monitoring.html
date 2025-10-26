@@ -91,6 +91,90 @@
         <!-- Map -->
         <div id="map"></div>
 
+        <!-- Building Change Detection Panel -->
+        <div id="buildingPanel" class="content-panel" style="display: none;">
+          <div class="panel-content">
+            <div class="panel-header">
+              <h3>🏢 Built-up Change Detection</h3>
+              <button id="closeBuildingPanel" class="close-panel-btn">×</button>
+            </div>
+            
+            <div class="upload-section">
+              <div class="upload-row">
+                <div class="upload-column">
+                  <label class="upload-label">Pre-Disaster Image</label>
+                  <div class="upload-area" id="preImageUpload">
+                    <div class="upload-placeholder">
+                      <div class="upload-icon">📁</div>
+                      <div class="upload-text">Click to upload or drag & drop</div>
+                      <div class="upload-hint">Supported: JPG, PNG, TIFF</div>
+                    </div>
+                    <input type="file" id="preImageInput" accept="image/*" style="display: none;">
+                    <img id="preImagePreview" class="image-preview" style="display: none;">
+                  </div>
+                </div>
+                
+                <div class="upload-column">
+                  <label class="upload-label">Post-Disaster Image</label>
+                  <div class="upload-area" id="postImageUpload">
+                    <div class="upload-placeholder">
+                      <div class="upload-icon">📁</div>
+                      <div class="upload-text">Click to upload or drag & drop</div>
+                      <div class="upload-hint">Supported: JPG, PNG, TIFF</div>
+                    </div>
+                    <input type="file" id="postImageInput" accept="image/*" style="display: none;">
+                    <img id="postImagePreview" class="image-preview" style="display: none;">
+                  </div>
+                </div>
+              </div>
+              
+              <div class="analysis-controls">
+                <button id="runAnalysisBtn" class="analyze-btn" disabled>
+                  <span class="btn-text">Run Change Detection</span>
+                  <span class="btn-loader" style="display: none;">⏳ Processing...</span>
+                </button>
+                <button id="resetAnalysisBtn" class="reset-btn">Reset</button>
+              </div>
+            </div>
+            
+            <div id="resultsSection" class="results-section" style="display: none;">
+              <div class="results-header">
+                <h4>🔍 Analysis Results</h4>
+              </div>
+              
+              <div class="results-stats">
+                <div class="stat-card">
+                  <div class="stat-label">Change Detected</div>
+                  <div id="changePercentage" class="stat-value">0%</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-label">Changed Pixels</div>
+                  <div id="changedPixels" class="stat-value">0</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-label">Total Area</div>
+                  <div id="totalPixels" class="stat-value">0</div>
+                </div>
+              </div>
+              
+              <div class="results-images">
+                <div class="result-image-card">
+                  <h5>Change Mask</h5>
+                  <img id="maskImage" class="result-image" alt="Change detection mask">
+                </div>
+                <div class="result-image-card">
+                  <h5>Comparison View</h5>
+                  <img id="comparisonImage" class="result-image" alt="Comparison view">
+                </div>
+                <div class="result-image-card">
+                  <h5>Overlay View</h5>
+                  <img id="overlayImage" class="result-image" alt="Overlay view">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Coordinates -->
         <div class="coordinates" id="coordinates">--- ---° N, --- ---° E</div>
 
@@ -295,6 +379,10 @@
             case 0: // Buildings
               activeFeature = "buildings";
               logger.info("Buildings monitoring activated");
+              // Show building change detection panel
+              if (buildingChangeDetection) {
+                buildingChangeDetection.showBuildingPanel();
+              }
               break;
 
             case 1: // Roads
