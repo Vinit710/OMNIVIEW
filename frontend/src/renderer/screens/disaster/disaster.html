@@ -59,6 +59,10 @@
             <div class="item-icon">⚠️</div>
             <span>Pre Disaster</span>
           </div>
+                    <div class="menu-item" data-section="post-disaster-report" id="postReportMenuItem">
+            <div class="item-icon">⚠️</div>
+            <span>Post Disaster report generator</span>
+          </div>
         </div>
 
         <button class="refresh-btn" id="refreshBtn">Refresh</button>
@@ -76,7 +80,7 @@
               placeholder="Search for news, disasters, or alerts..."
             />
             <button class="search-btn" id="searchBtn">Search</button>
-            <button class="report-btn" id="reportBtn">Generate Report</button>
+            <!-- <button class="report-btn" id="reportBtn">Generate Report</button> -->
           </div>
         </div>
 
@@ -96,9 +100,25 @@
     <div id="resultsContainer"></div>
   </div>
 
+<!-- Post Disaster Report Generator (separate view, no map) -->
+<div class="post-disaster-report" id="postDisasterReportSection" style="display: none; padding:12px;">
+  <div class="search-container" style="margin: 12px 0;">
+    <div class="search-box" style="display:flex; gap:8px; align-items:center;">
+      <input
+        type="text"
+        class="search-input"
+        id="postReportInput"
+        placeholder="Search for incidents, locations, or keywords..."
+        style="flex:1; padding:8px 12px; border-radius:6px; border:1px solid #444; background:#111; color:#fff;"
+      />
+      <button class="report-btn" id="postReportGenerateBtn" style="padding:8px 12px; border-radius:6px; background:#007bff; color:#fff; border:none; cursor:pointer;">Generate Report</button>
+    </div>
+  </div>
+</div>
+
 <!-- Post Disaster Section (MAP here) -->
+
 <div class="post-disaster-section" id="postDisasterSection" style="display: none;">
-  
   <!-- Filters + Generate Button -->
   <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
     <div>

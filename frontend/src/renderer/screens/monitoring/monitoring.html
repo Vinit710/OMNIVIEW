@@ -374,10 +374,18 @@
           }
           map.getContainer().style.cursor = "";
 
+          // Get reference to MarineTraffic iframe
+          const marineTrafficFrame = document.getElementById('marineTrafficFrame');
+          const mapDiv = document.getElementById('map');
+          
           // Handle specific feature activation
           switch (index) {
             case 0: // Buildings
               activeFeature = "buildings";
+              // Hide MarineTraffic iframe if it exists
+              if (marineTrafficFrame) marineTrafficFrame.style.display = 'none';
+              // Show map
+              mapDiv.style.display = 'block';
               logger.info("Buildings monitoring activated");
               // Show building change detection panel
               if (buildingChangeDetection) {
@@ -387,6 +395,8 @@
 
             case 1: // Roads
               activeFeature = "roads";
+              if (marineTrafficFrame) marineTrafficFrame.style.display = 'none';
+              mapDiv.style.display = 'block';
               areaSelectMode = true;
               map.getContainer().style.cursor = "crosshair";
               logger.info(
@@ -396,16 +406,51 @@
 
             case 2: // Water Bodies
               activeFeature = "water";
+              if (marineTrafficFrame) marineTrafficFrame.style.display = 'none';
+              mapDiv.style.display = 'block';
               logger.info("Water bodies monitoring activated");
               break;
 
             case 3: // Ships
               activeFeature = "ships";
-              logger.info("Ships monitoring activated");
+              // Hide the map
+              mapDiv.style.display = 'none';
+              
+              // Create a container for the ships view
+              const container = document.querySelector('.map-container');
+              let shipView = document.getElementById('shipView');
+              
+              if (!shipView) {
+                shipView = document.createElement('div');
+                shipView.id = 'shipView';
+                shipView.style.width = '100%';
+                shipView.style.height = '100%';
+                shipView.style.position = 'absolute';
+                shipView.style.top = '0';
+                shipView.style.left = '0';
+                shipView.style.background = '#fff';
+                shipView.style.padding = '20px';
+                shipView.style.textAlign = 'center';
+                shipView.innerHTML = `
+                  <div style="max-width: 600px; margin: 100px auto;">
+                    <h2 style="margin-bottom: 20px;">MarineTraffic Ship Tracking</h2>The MarineTraffic website cannot be embedded directly due to security restrictions. Please click the button below to open it in a secure window.
+                    <p style="margin-bottom: 20px;"></p>
+                    <button onclick="window.open('https://www.marinetraffic.com/en/ais/home/shipid:7753334/zoom:4', '_blank')" 
+                            style="padding: 10px 20px; background: #00a8e8; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                      Open MarineTraffic
+                    </button>
+                  </div>`;
+                container.appendChild(shipView);
+              } else {
+                shipView.style.display = 'block';
+              }
+              logger.info("Ships monitoring activated - MarineTraffic link available");
               break;
 
             case 4: // Aircraft
               activeFeature = "aircraft";
+              if (marineTrafficFrame) marineTrafficFrame.style.display = 'none';
+              mapDiv.style.display = 'block';
               logger.info("Aircraft tracking activated");
               // Clear any existing interval
               if (updateFlightsInterval) {

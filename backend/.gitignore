@@ -2,3 +2,4 @@ __pycache__/
 .env
 flights.json
 big_masks/
+unet_builtup_cd.pth

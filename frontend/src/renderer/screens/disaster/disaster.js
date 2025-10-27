@@ -11,7 +11,6 @@ let map,
 const menuItems = document.querySelectorAll(".menu-item"),
   searchInput = document.getElementById("searchInput"),
   searchBtn = document.getElementById("searchBtn"),
-  reportBtn = document.getElementById("reportBtn"),
   refreshBtn = document.getElementById("refreshBtn"),
   defaultContent = document.getElementById("defaultContent"),
   newsResults = document.getElementById("newsResults");
@@ -101,6 +100,7 @@ function loadDefaultContent() {
     (newsResults.style.display = "none"),
     (reportSection.style.display = "none"),
     (postDisasterSection.style.display = "none"),
+    (document.getElementById("postDisasterReportSection").style.display = "none"),
     (preDisasterContent.style.display = "none"),
     // Show search container for news section
     searchContainer.classList.remove("hidden"));
@@ -113,6 +113,7 @@ function showNewsResults() {
     (newsResults.style.display = "block"),
     (reportSection.style.display = "none"),
     (postDisasterSection.style.display = "none"),
+    (document.getElementById("postDisasterReportSection").style.display = "none"),
     (preDisasterContent.style.display = "none"),
     // Show search container for news section
     searchContainer.classList.remove("hidden"));
@@ -125,6 +126,7 @@ function showReportSection() {
     (newsResults.style.display = "none"),
     (reportSection.style.display = "block"),
     (postDisasterSection.style.display = "none"),
+    (document.getElementById("postDisasterReportSection").style.display = "none"),
     (preDisasterContent.style.display = "none"),
     // Show search container for report section
     searchContainer.classList.remove("hidden"));
@@ -191,6 +193,8 @@ function showPostDisaster() {
   newsResults.style.display = "none";
   reportSection.style.display = "none";
   postDisasterSection.style.display = "block";
+  // Ensure the standalone report generator view is hidden when showing the map-based post-disaster view
+  document.getElementById("postDisasterReportSection").style.display = "none";
   preDisasterContent.style.display = "none";
 
   // Hide search container
@@ -203,6 +207,24 @@ function showPostDisaster() {
     initMap();
     mapInitialized = true;
   }
+}
+
+// Show the standalone Post Disaster Report Generator view (no map or filters)
+function showPostDisasterReport() {
+  defaultContent.style.display = "none";
+  newsResults.style.display = "none";
+  reportSection.style.display = "none";
+  postDisasterSection.style.display = "none";
+  preDisasterContent.style.display = "none";
+
+  const el = document.getElementById("postDisasterReportSection");
+  if (el) el.style.display = "block";
+
+  // Hide the top shared search container since this view has its own input
+  searchContainer.classList.add("hidden");
+
+  // Ensure content area is visible
+  document.querySelector(".content-area").style.display = "block";
 }
 function initMap() {
   (((map = L.map("map").setView([20, 0], 2)),
@@ -310,43 +332,74 @@ function createDisasterIcon(type) {
     iconAnchor: [15, 15],
   });
 } // Create custom divIcon for emojis
-(menuItems.forEach((e) => {
+// Attach menu and UI handlers
+menuItems.forEach((e) => {
   e.addEventListener("click", function () {
-    (menuItems.forEach((e) => e.classList.remove("active")),
-      this.classList.add("active"),
-      (currentSection = this.getAttribute("data-section")),
-      updateSectionTitle(),
-      "post-disaster" === currentSection
-        ? showPostDisaster()
-        : isSearching || loadDefaultContent());
-  });
-}),
-  searchBtn.addEventListener("click", performSearch),
-  searchInput.addEventListener("keypress", function (e) {
-    "Enter" === e.key && performSearch();
-  }),
-  reportBtn.addEventListener("click", generateReport),
-  refreshBtn.addEventListener("click", function () {
-    isSearching ? performSearch() : loadDefaultContent();
-  }),
-  downloadReportBtn.addEventListener("click", function () {
-    const e = searchInput.value.trim() || "disaster_report",
-      t = reportContainer.querySelector(".report-content");
-    if (!t) return void addLog("error", "No report available to download.");
-    const n = t.innerText,
-      r = `disaster_report_${e.replace(/\s+/g, "_")}.md`,
-      o = path.join(
-        process.env.HOME || process.env.USERPROFILE,
-        "Downloads",
-        r
-      );
-    try {
-      (fs.writeFileSync(o, n),
-        addLog("info", "Report downloaded successfully to Downloads folder"));
-    } catch (e) {
-      addLog("error", `Download failed: ${e.message}`);
+    menuItems.forEach((m) => m.classList.remove("active"));
+    this.classList.add("active");
+    currentSection = this.getAttribute("data-section");
+    updateSectionTitle();
+    if (currentSection === "post-disaster") {
+      showPostDisaster();
+    } else if (currentSection === "post-disaster-report") {
+      showPostDisasterReport();
+    } else if (currentSection === "pre-disaster") {
+      showPreDisaster();
+    } else if (currentSection === "news") {
+      isSearching || loadDefaultContent();
+    } else {
+      isSearching || loadDefaultContent();
     }
-  }));
+  });
+});
+
+searchBtn.addEventListener("click", performSearch);
+searchInput.addEventListener("keypress", function (e) {
+  "Enter" === e.key && performSearch();
+});
+
+// Standalone Post Disaster Report generator wiring
+(function() {
+  const postReportInput = document.getElementById("postReportInput");
+  const postReportGenerateBtn = document.getElementById("postReportGenerateBtn");
+  if (postReportInput) {
+    // Pressing Enter in the input triggers Generate Report for the Post Disaster generator
+    postReportInput.addEventListener("keypress", function(e) {
+      if ("Enter" === e.key) {
+        searchInput.value = postReportInput.value || "";
+        generateReport();
+      }
+    });
+  }
+  if (postReportGenerateBtn && postReportInput) {
+    postReportGenerateBtn.addEventListener("click", function() {
+      searchInput.value = postReportInput.value || "";
+      generateReport();
+    });
+  }
+})();
+
+refreshBtn.addEventListener("click", function () {
+  isSearching ? performSearch() : loadDefaultContent();
+});
+
+downloadReportBtn.addEventListener("click", function () {
+  const e = searchInput.value.trim() || "disaster_report",
+    t = reportContainer.querySelector(".report-content");
+  if (!t) return void addLog("error", "No report available to download.");
+  const n = t.innerText,
+    r = `disaster_report_${e.replace(/\s+/g, "_")}.md`,
+    o = path.join(
+      process.env.HOME || process.env.USERPROFILE,
+      "Downloads",
+      r
+    );
+  try {
+    (fs.writeFileSync(o, n), addLog("info", "Report downloaded successfully to Downloads folder"));
+  } catch (e) {
+    addLog("error", `Download failed: ${e.message}`);
+  }
+});
 (document.addEventListener("DOMContentLoaded", function () {
   const e = document.getElementById("sidebarTitle"),
     t = document.getElementById("screenDropdown"),
@@ -455,6 +508,7 @@ function showPreDisaster() {
   newsResults.style.display = "none";
   reportSection.style.display = "none";
   postDisasterSection.style.display = "none";
+  document.getElementById("postDisasterReportSection").style.display = "none";
   preDisasterContent.style.display = "block";
 
   // Hide search container
@@ -533,21 +587,4 @@ function getAISummary(w) {
   return "No immediate disaster risk detected.";
 }
 
-// Attach to menu items (update this block)
-menuItems.forEach((item) => {
-  item.addEventListener("click", function () {
-    menuItems.forEach((i) => i.classList.remove("active"));
-    this.classList.add("active");
-    currentSection = this.getAttribute("data-section");
-    updateSectionTitle();
-    if (currentSection === "post-disaster") {
-      showPostDisaster();
-      hidePreDisaster();
-    } else if (currentSection === "pre-disaster") {
-      showPreDisaster();
-    } else if (currentSection === "news") {
-      isSearching || loadDefaultContent();
-      hidePreDisaster();
-    }
-  });
-});
+// (menu click handling is attached earlier in the file)
