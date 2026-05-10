@@ -6,7 +6,7 @@ import tempfile
 import os
 import traceback
 import json
-import google.generativeai as genai
+from google import genai as genai_new
 from dotenv import load_dotenv
 import io
 from io import BytesIO
@@ -53,8 +53,14 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 if not GEMINI_API_KEY or not GOOGLE_API_KEY or not GOOGLE_CX:
     raise ValueError("Required API keys (GEMINI_API_KEY, GOOGLE_API_KEY, GOOGLE_CX) must be set in environment variables")
 
-# Configure Gemini
-genai.configure(api_key=GEMINI_API_KEY)
+# Configure Gemini (new SDK)
+_gemini_client = None
+
+def get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = genai_new.Client(api_key=GEMINI_API_KEY)
+    return _gemini_client
 
 
 app = Flask(__name__)
@@ -260,9 +266,11 @@ class DisasterResponseAgent:
         return fallback_articles
 
     def get_google_images(self, query, num_results=8):
-        """Fetch disaster images using Google Custom Search API with robust fallbacks"""
+        """Fetch disaster images: Google CSE → ReliefWeb → Wikimedia → RSS HTML → placeholder"""
+
+        # ── 1. Google Custom Search Image API ──
         try:
-            enhanced_query = f"{query} disaster damage aerial satellite emergency"
+            enhanced_query = f"{query} disaster damage flood fire earthquake"
             url = "https://www.googleapis.com/customsearch/v1"
             params = {
                 'key': GOOGLE_API_KEY,
@@ -270,40 +278,134 @@ class DisasterResponseAgent:
                 'q': enhanced_query,
                 'searchType': 'image',
                 'num': min(num_results, 10),
-                'imgSize': 'large',
                 'imgType': 'photo',
-                'safe': 'active'
+                'safe': 'active',
             }
-            
-            app.logger.info(f"Searching Google Images for: {enhanced_query}")
+            app.logger.info(f"Searching Google CSE Images for: {enhanced_query}")
             response = requests.get(url, params=params, timeout=20)
-            
             if response.status_code == 200:
-                data = response.json()
-                images = []
-                
-                for item in data.get('items', []):
-                    images.append({
+                items = response.json().get('items', [])
+                images = [
+                    {
                         'url': item.get('link', ''),
                         'title': item.get('title', f'{query} Disaster Image'),
-                        'context': item.get('snippet', f'Disaster imagery related to {query}'),
-                        'source': item.get('displayLink', 'Image Source')
-                    })
-                
-                app.logger.info(f"Found {len(images)} images from Google")
-                
+                        'context': item.get('snippet', ''),
+                        'source': item.get('displayLink', 'Google Images'),
+                    }
+                    for item in items
+                    if item.get('link', '').startswith('http')
+                ]
                 if images:
+                    app.logger.info(f"Google CSE returned {len(images)} images")
                     return images
-                else:
-                    app.logger.warning("No images found in Google response, using fallback")
-                    return self.get_fallback_images(query)
+                app.logger.warning(f"Google CSE returned 0 images — PSE may not have image search enabled")
             else:
-                app.logger.error(f"Google Images API error: {response.status_code}")
-                return self.get_fallback_images(query)
-                
+                app.logger.warning(f"Google CSE Images error: {response.status_code}")
         except Exception as e:
-            app.logger.error(f"Google Images fetch failed: {e}")
-            return self.get_fallback_images(query)
+            app.logger.error(f"Google CSE Images failed: {e}")
+
+        # ── 2. Wikimedia Commons (generic disaster terms, no year) ──
+        try:
+            # Strip year and over-specific location for broader Wikimedia match
+            wm_query = re.sub(r'\b(20\d{2}|19\d{2})\b', '', query).strip()
+            # Extract disaster type keyword
+            disaster_types = ['flood', 'earthquake', 'cyclone', 'wildfire', 'fire', 'landslide',
+                              'tsunami', 'hurricane', 'typhoon', 'drought', 'avalanche', 'volcano']
+            disaster_kw = next((kw for kw in disaster_types if kw in wm_query.lower()), 'disaster')
+            wm_search = f"{disaster_kw} damage destruction"
+            app.logger.info(f"Trying Wikimedia Commons for: {wm_search}")
+            wm_params = {
+                'action': 'query',
+                'generator': 'search',
+                'gsrnamespace': 6,
+                'gsrsearch': wm_search,
+                'gsrlimit': num_results + 5,
+                'prop': 'imageinfo',
+                'iiprop': 'url|extmetadata',
+                'iiurlwidth': 800,
+                'format': 'json',
+            }
+            wm_resp = requests.get(
+                "https://commons.wikimedia.org/w/api.php",
+                params=wm_params, timeout=15,
+                headers={'User-Agent': 'OmniView/3.0 disaster-assessment'}
+            )
+            if wm_resp.status_code == 200:
+                pages = wm_resp.json().get('query', {}).get('pages', {})
+                images = []
+                for page in pages.values():
+                    ii = page.get('imageinfo', [{}])[0]
+                    img_url = ii.get('thumburl') or ii.get('url', '')
+                    if not img_url or not any(img_url.split('?')[0].lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp']):
+                        continue
+                    meta = ii.get('extmetadata', {})
+                    title = meta.get('ImageDescription', {}).get('value', '') or page.get('title', query)
+                    title = re.sub(r'<[^>]+>', '', title)[:120]
+                    images.append({
+                        'url': img_url,
+                        'title': title or f'{query} disaster image',
+                        'context': f'Wikimedia Commons — {disaster_kw}',
+                        'source': 'Wikimedia Commons',
+                    })
+                    if len(images) >= num_results:
+                        break
+                if images:
+                    app.logger.info(f"Wikimedia Commons returned {len(images)} images")
+                    return images
+                app.logger.warning("Wikimedia Commons returned 0 images")
+        except Exception as e:
+            app.logger.error(f"Wikimedia Commons failed: {e}")
+
+        # ── 3. Extract images from Google News RSS entry summaries ──
+        try:
+            app.logger.info(f"Extracting images from RSS entry HTML for: {query}")
+            rss_url = (
+                "https://news.google.com/rss/search"
+                f"?q={quote(query + ' disaster')}&hl=en-IN&gl=IN&ceid=IN:en"
+            )
+            feed = feedparser.parse(rss_url)
+            images = []
+            img_tag_re = re.compile(r'<img[^>]+src=["\']([^"\']+)["\']', re.IGNORECASE)
+            for entry in feed.entries[:num_results * 3]:
+                # Check media_content / media_thumbnail first
+                for attr in ('media_content', 'media_thumbnail'):
+                    for m in entry.get(attr, []):
+                        u = m.get('url', '')
+                        if u.startswith('http'):
+                            images.append({
+                                'url': u,
+                                'title': entry.get('title', f'{query} news'),
+                                'context': 'News thumbnail',
+                                'source': entry.get('source', {}).get('title', 'Google News'),
+                            })
+                            break
+                    if images and images[-1].get('source'):
+                        break
+                else:
+                    # Parse img tags from summary HTML
+                    summary = entry.get('summary', '') or entry.get('description', '')
+                    for m in img_tag_re.finditer(summary):
+                        u = m.group(1)
+                        if u.startswith('http') and not u.endswith('.gif'):
+                            images.append({
+                                'url': u,
+                                'title': entry.get('title', f'{query} news'),
+                                'context': 'News article image',
+                                'source': entry.get('source', {}).get('title', 'Google News'),
+                            })
+                            break
+                if len(images) >= num_results:
+                    break
+            if images:
+                app.logger.info(f"RSS HTML images returned {len(images)} images")
+                return images
+            app.logger.warning("RSS HTML images returned 0 images")
+        except Exception as e:
+            app.logger.error(f"RSS image extraction failed: {e}")
+
+        # ── 4. Local placeholder fallback ──
+        app.logger.warning("All image sources failed — using local placeholders")
+        return self.get_fallback_images(query)
 
     def get_fallback_images(self, query):
         """Generate fallback images when Google Images fails"""
@@ -465,9 +567,14 @@ Analyze this image and return ONLY a valid JSON object with no markdown, no expl
     "coordination_needs": "<agencies needed based on damage visible>"
 }}"""
 
-                    model = genai.GenerativeModel('gemini-2.5-flash')
-                    img_part = {"mime_type": mime, "data": base64.b64encode(image_bytes).decode()}
-                    response = model.generate_content([vision_prompt, img_part])
+                    client = get_gemini_client()
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=[
+                            vision_prompt,
+                            genai_new.types.Part.from_bytes(data=image_bytes, mime_type=mime),
+                        ]
+                    )
                     if response and response.text:
                         detailed_data = self._parse_llm_json(response.text, query)
                         app.logger.info(f"Gemini vision analysis success for image {image_id}")
@@ -650,8 +757,11 @@ Based on this image description, return ONLY a valid JSON object with no markdow
         # Try Gemini first
         if provider == "gemini" and GEMINI_API_KEY:
             try:
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                response = model.generate_content(prompt)
+                client = get_gemini_client()
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt
+                )
                 if response and response.text:
                     return response.text
             except Exception as e:
@@ -1032,8 +1142,11 @@ def test_system():
     
     # Test Gemini
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content("Test: Respond with 'Gemini OK'")
+        client = get_gemini_client()
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents="Test: Respond with 'Gemini OK'"
+        )
         test_results["gemini"] = "✅ Working" if response.text else "❌ Failed"
     except Exception as e:
         test_results["gemini"] = f"❌ Error: {str(e)[:50]}"
@@ -1146,8 +1259,11 @@ def _generate_news_brief(query, articles):
 
     if GEMINI_API_KEY:
         try:
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            response = model.generate_content(prompt)
+            client = get_gemini_client()
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt
+            )
             if response and response.text:
                 return response.text.strip()
         except Exception as e:
