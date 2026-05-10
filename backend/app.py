@@ -266,9 +266,32 @@ class DisasterResponseAgent:
         return fallback_articles
 
     def get_google_images(self, query, num_results=8):
-        """Fetch disaster images: Google CSE → ReliefWeb → Wikimedia → RSS HTML → placeholder"""
+        """Fetch disaster images: DDG → Google CSE → Wikimedia → RSS HTML → placeholder"""
 
-        # ── 1. Google Custom Search Image API ──
+        # ── 1. DuckDuckGo Image Search (free, no key, query-specific) ──
+        try:
+            from ddgs import DDGS
+            app.logger.info(f"Searching DDG Images for: {query} disaster")
+            with DDGS() as ddgs:
+                results = list(ddgs.images(f"{query} disaster", max_results=num_results))
+            images = []
+            for r in results:
+                img_url = r.get('image', '')
+                if img_url and img_url.startswith('http'):
+                    images.append({
+                        'url': img_url,
+                        'title': r.get('title', f'{query} disaster image'),
+                        'context': r.get('source', ''),
+                        'source': r.get('source', 'DuckDuckGo Images'),
+                    })
+            if images:
+                app.logger.info(f"DDG Images returned {len(images)} images")
+                return images
+            app.logger.warning("DDG Images returned 0 images")
+        except Exception as e:
+            app.logger.error(f"DDG Images failed: {e}")
+
+        # ── 2. Google Custom Search Image API ──
         try:
             enhanced_query = f"{query} disaster damage flood fire earthquake"
             url = "https://www.googleapis.com/customsearch/v1"
@@ -298,13 +321,110 @@ class DisasterResponseAgent:
                 if images:
                     app.logger.info(f"Google CSE returned {len(images)} images")
                     return images
-                app.logger.warning(f"Google CSE returned 0 images — PSE may not have image search enabled")
+                app.logger.warning("Google CSE returned 0 images — PSE may not have image search enabled")
             else:
                 app.logger.warning(f"Google CSE Images error: {response.status_code}")
         except Exception as e:
             app.logger.error(f"Google CSE Images failed: {e}")
 
-        # ── 2. Wikimedia Commons (generic disaster terms, no year) ──
+        # ── 3. Wikimedia Commons (generic disaster terms, no year) ──
+        try:
+            wm_query = re.sub(r'\b(20\d{2}|19\d{2})\b', '', query).strip()
+            disaster_types = ['flood', 'earthquake', 'cyclone', 'wildfire', 'fire', 'landslide',
+                              'tsunami', 'hurricane', 'typhoon', 'drought', 'avalanche', 'volcano']
+            disaster_kw = next((kw for kw in disaster_types if kw in wm_query.lower()), 'disaster')
+            wm_search = f"{disaster_kw} damage destruction"
+            app.logger.info(f"Trying Wikimedia Commons for: {wm_search}")
+            wm_params = {
+                'action': 'query',
+                'generator': 'search',
+                'gsrnamespace': 6,
+                'gsrsearch': wm_search,
+                'gsrlimit': num_results + 5,
+                'prop': 'imageinfo',
+                'iiprop': 'url|extmetadata',
+                'iiurlwidth': 800,
+                'format': 'json',
+            }
+            wm_resp = requests.get(
+                "https://commons.wikimedia.org/w/api.php",
+                params=wm_params, timeout=15,
+                headers={'User-Agent': 'OmniView/3.0 disaster-assessment'}
+            )
+            if wm_resp.status_code == 200:
+                pages = wm_resp.json().get('query', {}).get('pages', {})
+                images = []
+                for page in pages.values():
+                    ii = page.get('imageinfo', [{}])[0]
+                    img_url = ii.get('thumburl') or ii.get('url', '')
+                    if not img_url or not any(img_url.split('?')[0].lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp']):
+                        continue
+                    meta = ii.get('extmetadata', {})
+                    title = meta.get('ImageDescription', {}).get('value', '') or page.get('title', query)
+                    title = re.sub(r'<[^>]+>', '', title)[:120]
+                    images.append({
+                        'url': img_url,
+                        'title': title or f'{query} disaster image',
+                        'context': f'Wikimedia Commons — {disaster_kw}',
+                        'source': 'Wikimedia Commons',
+                    })
+                    if len(images) >= num_results:
+                        break
+                if images:
+                    app.logger.info(f"Wikimedia Commons returned {len(images)} images")
+                    return images
+                app.logger.warning("Wikimedia Commons returned 0 images")
+        except Exception as e:
+            app.logger.error(f"Wikimedia Commons failed: {e}")
+
+        # ── 4. Extract images from Google News RSS entry summaries ──
+        try:
+            app.logger.info(f"Extracting images from RSS entry HTML for: {query}")
+            rss_url = (
+                "https://news.google.com/rss/search"
+                f"?q={quote(query + ' disaster')}&hl=en-IN&gl=IN&ceid=IN:en"
+            )
+            feed = feedparser.parse(rss_url)
+            images = []
+            img_tag_re = re.compile(r'<img[^>]+src=["\']([^"\']+)["\']', re.IGNORECASE)
+            for entry in feed.entries[:num_results * 3]:
+                for attr in ('media_content', 'media_thumbnail'):
+                    for m in entry.get(attr, []):
+                        u = m.get('url', '')
+                        if u.startswith('http'):
+                            images.append({
+                                'url': u,
+                                'title': entry.get('title', f'{query} news'),
+                                'context': 'News thumbnail',
+                                'source': entry.get('source', {}).get('title', 'Google News'),
+                            })
+                            break
+                    if images and images[-1].get('source'):
+                        break
+                else:
+                    summary = entry.get('summary', '') or entry.get('description', '')
+                    for m in img_tag_re.finditer(summary):
+                        u = m.group(1)
+                        if u.startswith('http') and not u.endswith('.gif'):
+                            images.append({
+                                'url': u,
+                                'title': entry.get('title', f'{query} news'),
+                                'context': 'News article image',
+                                'source': entry.get('source', {}).get('title', 'Google News'),
+                            })
+                            break
+                if len(images) >= num_results:
+                    break
+            if images:
+                app.logger.info(f"RSS HTML images returned {len(images)} images")
+                return images
+            app.logger.warning("RSS HTML images returned 0 images")
+        except Exception as e:
+            app.logger.error(f"RSS image extraction failed: {e}")
+
+        # ── 5. Local placeholder fallback ──
+        app.logger.warning("All image sources failed — using local placeholders")
+        return self.get_fallback_images(query)
         try:
             # Strip year and over-specific location for broader Wikimedia match
             wm_query = re.sub(r'\b(20\d{2}|19\d{2})\b', '', query).strip()
@@ -356,7 +476,7 @@ class DisasterResponseAgent:
         except Exception as e:
             app.logger.error(f"Wikimedia Commons failed: {e}")
 
-        # ── 3. Extract images from Google News RSS entry summaries ──
+        # ── 4. Extract images from Google News RSS entry summaries ──
         try:
             app.logger.info(f"Extracting images from RSS entry HTML for: {query}")
             rss_url = (
@@ -403,7 +523,7 @@ class DisasterResponseAgent:
         except Exception as e:
             app.logger.error(f"RSS image extraction failed: {e}")
 
-        # ── 4. Local placeholder fallback ──
+        # ── 5. Local placeholder fallback ──
         app.logger.warning("All image sources failed — using local placeholders")
         return self.get_fallback_images(query)
 
@@ -827,122 +947,191 @@ Based on this image description, return ONLY a valid JSON object with no markdow
         """
 
     def generate_comprehensive_charts(self, news_data, image_analysis):
-        """Generate professional disaster assessment charts with improved error handling"""
+        """Generate readable disaster assessment charts"""
         charts = {}
-        
+
         try:
-            # Set style
-            plt.style.use('default')
-            
-            # Get successful analyses
+            plt.rcParams.update({
+                'font.size': 13,
+                'font.family': 'DejaVu Sans',
+                'axes.titlesize': 15,
+                'axes.titleweight': 'bold',
+                'axes.labelsize': 13,
+                'xtick.labelsize': 12,
+                'ytick.labelsize': 12,
+                'figure.facecolor': 'white',
+                'axes.facecolor': '#f8f9fa',
+                'axes.grid': True,
+                'grid.alpha': 0.4,
+                'grid.linestyle': '--',
+            })
+
             successful_analyses = [img for img in image_analysis if img.get('processing_status') == 'success']
-            
-            if successful_analyses:
-                # Damage Severity Chart
-                severity_scores = []
-                image_labels = []
-                
-                for img in successful_analyses:
-                    analysis = img.get('detailed_analysis', {})
-                    score = analysis.get('damage_severity_score', 5)
-                    if isinstance(score, str):
-                        try:
-                            score = int(re.findall(r'\d+', score)[0])
-                        except:
-                            score = 5
-                    severity_scores.append(min(max(score, 1), 10))  # Ensure 1-10 range
-                    image_labels.append(f"Point {img['image_id']}")
-                
-                # Create severity chart
-                fig, ax = plt.subplots(figsize=(12, 8))
-                colors = ['#d32f2f' if score >= 8 else '#f57c00' if score >= 6 else '#fbc02d' if score >= 4 else '#388e3c' for score in severity_scores]
-                
-                bars = ax.bar(image_labels, severity_scores, color=colors, alpha=0.8, edgecolor='black', linewidth=1)
-                
-                for bar, score in zip(bars, severity_scores):
-                    height = bar.get_height()
-                    ax.text(bar.get_x() + bar.get_width()/2., height + 0.1, f'{score}',
-                           ha='center', va='bottom', fontweight='bold', fontsize=12)
-                
-                ax.set_ylabel('Damage Severity (1-10 Scale)', fontsize=12, fontweight='bold')
-                ax.set_title(f'Disaster Damage Assessment\nAverage Severity: {np.mean(severity_scores):.1f}/10', 
-                            fontsize=14, fontweight='bold', pad=20)
-                ax.set_ylim(0, 11)
-                ax.grid(True, alpha=0.3, axis='y')
-                
-                plt.tight_layout()
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-                buffer.seek(0)
-                charts['damage_severity'] = "data:image/png;base64," + base64.b64encode(buffer.read()).decode()
-                plt.close()
-                
-                # Priority Distribution Chart
-                priority_counts = {'high': 0, 'medium': 0, 'low': 0}
-                
-                for img in successful_analyses:
-                    priority = img.get('detailed_analysis', {}).get('emergency_priority', 'medium').lower()
-                    if 'high' in priority:
-                        priority_counts['high'] += 1
-                    elif 'low' in priority:
-                        priority_counts['low'] += 1
-                    else:
-                        priority_counts['medium'] += 1
-                
-                if sum(priority_counts.values()) > 0:
-                    fig, ax = plt.subplots(figsize=(10, 8))
-                    colors = ['#d32f2f', '#f57c00', '#388e3c']
-                    labels = ['High Priority', 'Medium Priority', 'Low Priority']
-                    values = [priority_counts['high'], priority_counts['medium'], priority_counts['low']]
-                    
-                    # Filter out zero values
-                    non_zero_data = [(label, value, color) for label, value, color in zip(labels, values, colors) if value > 0]
-                    if non_zero_data:
-                        labels, values, colors = zip(*non_zero_data)
-                        
-                        wedges, texts, autotexts = ax.pie(values, labels=labels, colors=colors, 
-                                                         autopct='%1.1f%%', startangle=90)
-                        
-                        ax.set_title('Emergency Priority Distribution', fontsize=14, fontweight='bold')
-                        
-                        plt.tight_layout()
-                        buffer = io.BytesIO()
-                        plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-                        buffer.seek(0)
-                        charts['priority_distribution'] = "data:image/png;base64," + base64.b64encode(buffer.read()).decode()
-                        plt.close()
-                
-                # Resource Allocation Chart
-                avg_severity = np.mean(severity_scores)
-                resources = ['Search & Rescue', 'Medical Services', 'Emergency Supplies', 'Temporary Shelters', 'Infrastructure', 'Communications']
-                
-                if avg_severity >= 7:
-                    allocation = [30, 25, 20, 15, 8, 2]
-                elif avg_severity >= 5:
-                    allocation = [25, 20, 25, 15, 12, 3]
+
+            if not successful_analyses:
+                return charts
+
+            # ── Parse severity scores ──
+            severity_scores = []
+            image_labels = []
+            priority_labels = []
+            for img in successful_analyses:
+                a = img.get('detailed_analysis', {})
+                score = a.get('damage_severity_score', 5)
+                if isinstance(score, str):
+                    nums = re.findall(r'\d+', str(score))
+                    score = int(nums[0]) if nums else 5
+                score = min(max(int(score), 1), 10)
+                severity_scores.append(score)
+                image_labels.append(f"Loc {img['image_id']}")
+                priority_labels.append(a.get('emergency_priority', 'medium').lower())
+
+            avg_sev = np.mean(severity_scores)
+
+            # ── Chart 1: Damage Severity Bar Chart ──
+            fig, ax = plt.subplots(figsize=(max(10, len(severity_scores) * 1.8), 7))
+
+            bar_colors = []
+            for s in severity_scores:
+                if s >= 8:
+                    bar_colors.append('#c0392b')   # red — critical
+                elif s >= 6:
+                    bar_colors.append('#e67e22')   # orange — high
+                elif s >= 4:
+                    bar_colors.append('#f1c40f')   # yellow — medium
                 else:
-                    allocation = [20, 15, 30, 20, 12, 3]
-                
-                fig, ax = plt.subplots(figsize=(10, 8))
-                colors = plt.cm.Set3(np.linspace(0, 1, len(resources)))
-                
-                wedges, texts, autotexts = ax.pie(allocation, labels=resources, colors=colors, 
-                                                 autopct='%1.1f%%', startangle=90)
-                
-                ax.set_title(f'Recommended Resource Allocation\n(Avg Severity: {avg_severity:.1f}/10)', 
-                            fontsize=14, fontweight='bold')
-                
+                    bar_colors.append('#27ae60')   # green — low
+
+            bars = ax.bar(image_labels, severity_scores, color=bar_colors,
+                          edgecolor='white', linewidth=1.5, width=0.55, zorder=3)
+
+            # Value labels on top of bars
+            for bar, score in zip(bars, severity_scores):
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + 0.15,
+                    f'{score}/10',
+                    ha='center', va='bottom',
+                    fontsize=13, fontweight='bold', color='#2c3e50'
+                )
+
+            # Severity zone bands
+            ax.axhspan(0, 3, alpha=0.06, color='#27ae60', label='Low (1–3)')
+            ax.axhspan(3, 6, alpha=0.06, color='#f1c40f', label='Medium (4–6)')
+            ax.axhspan(6, 8, alpha=0.06, color='#e67e22', label='High (7–8)')
+            ax.axhspan(8, 10, alpha=0.06, color='#c0392b', label='Critical (9–10)')
+
+            # Average line
+            ax.axhline(avg_sev, color='#2980b9', linewidth=2, linestyle='--',
+                       label=f'Average: {avg_sev:.1f}', zorder=4)
+
+            ax.set_ylim(0, 11.5)
+            ax.set_ylabel('Damage Severity Score (1–10)', labelpad=10)
+            ax.set_title(f'Damage Severity by Assessment Location\nAverage: {avg_sev:.1f}/10  |  {len(severity_scores)} locations analysed',
+                         pad=16)
+            ax.set_xticks(range(len(image_labels)))
+            ax.set_xticklabels(image_labels, rotation=0)
+            ax.legend(loc='upper right', fontsize=11, framealpha=0.9)
+            ax.set_axisbelow(True)
+
+            plt.tight_layout()
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+            buf.seek(0)
+            charts['damage_severity'] = "data:image/png;base64," + base64.b64encode(buf.read()).decode()
+            plt.close()
+
+            # ── Chart 2: Priority Distribution Horizontal Bar ──
+            priority_counts = {'High': 0, 'Medium': 0, 'Low': 0}
+            for p in priority_labels:
+                if 'high' in p:
+                    priority_counts['High'] += 1
+                elif 'low' in p:
+                    priority_counts['Low'] += 1
+                else:
+                    priority_counts['Medium'] += 1
+
+            non_zero = {k: v for k, v in priority_counts.items() if v > 0}
+            if non_zero:
+                fig, ax = plt.subplots(figsize=(9, max(4, len(non_zero) * 1.4)))
+                p_colors = {'High': '#c0392b', 'Medium': '#e67e22', 'Low': '#27ae60'}
+                keys = list(non_zero.keys())
+                vals = [non_zero[k] for k in keys]
+                colors_p = [p_colors[k] for k in keys]
+
+                bars_h = ax.barh(keys, vals, color=colors_p, edgecolor='white',
+                                 linewidth=1.5, height=0.5, zorder=3)
+
+                for bar, val in zip(bars_h, vals):
+                    pct = val / len(successful_analyses) * 100
+                    ax.text(bar.get_width() + 0.05, bar.get_y() + bar.get_height() / 2,
+                            f'{val} location{"s" if val > 1 else ""}  ({pct:.0f}%)',
+                            va='center', fontsize=12, fontweight='bold', color='#2c3e50')
+
+                ax.set_xlim(0, max(vals) + max(vals) * 0.45)
+                ax.set_xlabel('Number of Locations', labelpad=10)
+                ax.set_title(f'Emergency Priority Distribution\n{len(successful_analyses)} locations assessed',
+                             pad=14)
+                ax.set_axisbelow(True)
+                ax.invert_yaxis()
+
                 plt.tight_layout()
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-                buffer.seek(0)
-                charts['resource_allocation'] = "data:image/png;base64," + base64.b64encode(buffer.read()).decode()
+                buf = io.BytesIO()
+                plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+                buf.seek(0)
+                charts['priority_distribution'] = "data:image/png;base64," + base64.b64encode(buf.read()).decode()
                 plt.close()
-            
+
+            # ── Chart 3: Resource Allocation Horizontal Bar ──
+            resources = [
+                'Search & Rescue',
+                'Medical Services',
+                'Emergency Supplies',
+                'Temporary Shelters',
+                'Infrastructure Repair',
+                'Communications',
+            ]
+            if avg_sev >= 7:
+                allocation = [30, 25, 20, 15, 8, 2]
+            elif avg_sev >= 5:
+                allocation = [25, 20, 25, 15, 12, 3]
+            else:
+                allocation = [20, 15, 30, 20, 12, 3]
+
+            res_colors = ['#c0392b', '#e74c3c', '#e67e22', '#3498db', '#9b59b6', '#1abc9c']
+
+            fig, ax = plt.subplots(figsize=(11, 7))
+            bars_r = ax.barh(resources, allocation, color=res_colors,
+                             edgecolor='white', linewidth=1.5, height=0.55, zorder=3)
+
+            for bar, pct in zip(bars_r, allocation):
+                ax.text(bar.get_width() + 0.4, bar.get_y() + bar.get_height() / 2,
+                        f'{pct}%',
+                        va='center', fontsize=13, fontweight='bold', color='#2c3e50')
+
+            ax.set_xlim(0, max(allocation) + 10)
+            ax.set_xlabel('Recommended Allocation (%)', labelpad=10)
+            ax.set_title(
+                f'Recommended Resource Allocation\nBased on avg severity {avg_sev:.1f}/10  '
+                f'— {"Critical response" if avg_sev >= 7 else "Moderate response" if avg_sev >= 5 else "Standard response"} profile',
+                pad=14
+            )
+            ax.set_axisbelow(True)
+            ax.invert_yaxis()
+
+            plt.tight_layout()
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+            buf.seek(0)
+            charts['resource_allocation'] = "data:image/png;base64," + base64.b64encode(buf.read()).decode()
+            plt.close()
+
         except Exception as e:
             app.logger.error(f"Chart generation error: {e}")
             charts['error'] = str(e)
-        
+        finally:
+            plt.rcdefaults()
+
         return charts
 
     def calculate_average_severity(self, image_analysis):
