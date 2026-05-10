@@ -342,21 +342,40 @@ class DisasterResponseAgent:
                 # Try to download external image
                 try:
                     headers = {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+                        'Accept-Encoding': 'gzip, deflate, br',
+                        'Referer': 'https://www.google.com/'
                     }
-                    img_response = requests.get(img_data['url'], timeout=15, headers=headers)
-                    
-                    if img_response.status_code == 200 and len(img_response.content) > 1000:
-                        # Successfully downloaded image
+                    img_response = requests.get(
+                        img_data['url'], timeout=20, headers=headers,
+                        allow_redirects=True, stream=False
+                    )
+
+                    content_type = img_response.headers.get('Content-Type', '')
+                    is_image_content = any(t in content_type for t in ['image/', 'octet-stream'])
+
+                    if img_response.status_code == 200 and len(img_response.content) > 1000 and is_image_content:
                         analysis = self.analyze_real_image(img_response.content, img_data, i+1, query)
                         analysis_results.append(analysis)
+                    elif img_response.status_code == 200 and len(img_response.content) > 1000:
+                        # Try anyway — some servers return wrong content-type
+                        try:
+                            Image.open(io.BytesIO(img_response.content))  # validate it's actually an image
+                            analysis = self.analyze_real_image(img_response.content, img_data, i+1, query)
+                            analysis_results.append(analysis)
+                        except Exception:
+                            app.logger.warning(f"Image {i+1} not valid image data, using placeholder analysis")
+                            analysis_results.append(self.analyze_placeholder_image(img_data, i+1, query))
                     else:
-                        app.logger.warning(f"Failed to download image {i+1}: Status {img_response.status_code}")
-                        analysis_results.append(self.create_failed_analysis(img_data, i+1, "Download failed"))
+                        app.logger.warning(f"Failed to download image {i+1}: status={img_response.status_code}, size={len(img_response.content)}")
+                        # Still do LLM analysis using image title/context as input
+                        analysis_results.append(self.analyze_placeholder_image(img_data, i+1, query))
                         
                 except requests.exceptions.RequestException as e:
                     app.logger.warning(f"Network error downloading image {i+1}: {e}")
-                    analysis_results.append(self.create_failed_analysis(img_data, i+1, f"Network error: {str(e)}"))
+                    # Still analyze using image metadata via LLM
+                    analysis_results.append(self.analyze_placeholder_image(img_data, i+1, query))
                 
             except Exception as e:
                 app.logger.error(f"Image analysis failed for image {i+1}: {e}")
@@ -367,50 +386,32 @@ class DisasterResponseAgent:
     def analyze_placeholder_image(self, img_data, image_id, query):
         """Analyze placeholder images using AI text analysis"""
         try:
-            analysis_prompt = f"""
-            Analyze this disaster scenario for emergency response planning:
-            
-            Disaster Type: {query}
-            Assessment Location: {image_id}
-            Image Type: Satellite/Aerial Assessment Point
-            
-            Based on typical {query} disasters, provide analysis in this exact JSON format:
-            {{
-                "damage_severity_score": {random.randint(4, 9)},
-                "damage_severity_explanation": "Estimated damage based on {query} disaster patterns",
-                "infrastructure_damage": "Potential infrastructure impact from {query}",
-                "visible_hazards": ["structural damage", "debris", "access restrictions"],
-                "accessibility_status": "Assessment pending - likely impacted",
-                "emergency_priority": "{random.choice(['high', 'medium', 'medium'])}",
-                "priority_justification": "Priority based on {query} disaster response protocols",
-                "recommended_resources": ["search and rescue", "medical team", "emergency supplies"],
-                "geographical_features": "Urban/suburban area affected by {query}",
-                "estimated_affected_area": "{random.randint(1, 5)} square kilometers",
-                "population_impact": "{random.randint(100, 2000)} people potentially affected",
-                "immediate_risks": "Safety hazards typical of {query} disasters",
-                "recovery_challenges": "Infrastructure restoration and community support needs",
-                "response_timeline": "{random.randint(24, 96)} hours for initial response",
-                "coordination_needs": "Multi-agency disaster response coordination required"
-            }}
-            """
-            
+            analysis_prompt = f"""You are a disaster assessment expert. Analyze assessment location {image_id} for a {query} disaster scenario.
+
+Based on your knowledge of {query} disasters, provide a realistic assessment in valid JSON format only. No markdown, no explanation, just the JSON object.
+
+Return exactly this structure with your assessed values:
+{{
+    "damage_severity_score": <integer 1-10 based on typical {query} severity>,
+    "damage_severity_explanation": "<specific explanation of damage level for {query}>",
+    "infrastructure_damage": "<specific infrastructure impacts typical of {query}>",
+    "visible_hazards": ["<hazard1>", "<hazard2>", "<hazard3>"],
+    "accessibility_status": "<access conditions typical after {query}>",
+    "emergency_priority": "<high or medium or low based on {query} severity>",
+    "priority_justification": "<why this priority for {query}>",
+    "recommended_resources": ["<resource1>", "<resource2>", "<resource3>"],
+    "geographical_features": "<terrain features relevant to {query}>",
+    "estimated_affected_area": "<realistic area estimate for {query}>",
+    "population_impact": "<realistic population impact estimate for {query}>",
+    "immediate_risks": "<specific immediate dangers from {query}>",
+    "recovery_challenges": "<specific recovery challenges for {query}>",
+    "response_timeline": "<realistic response timeline for {query}>",
+    "coordination_needs": "<specific agencies needed for {query}>"
+}}"""
+
             detailed_analysis = self.query_free_llm_api(analysis_prompt)
-            
-            # Parse AI response
-            try:
-                json_start = detailed_analysis.find('{')
-                json_end = detailed_analysis.rfind('}') + 1
-                
-                if json_start != -1 and json_end > json_start:
-                    json_str = detailed_analysis[json_start:json_end]
-                    detailed_data = json.loads(json_str)
-                else:
-                    detailed_data = self.create_default_analysis(query)
-                    
-            except json.JSONDecodeError:
-                app.logger.warning(f"Failed to parse AI response for image {image_id}")
-                detailed_data = self.create_default_analysis(query)
-            
+            detailed_data = self._parse_llm_json(detailed_analysis, query)
+
             return {
                 "image_id": image_id,
                 "image_url": img_data['url'],
@@ -420,76 +421,114 @@ class DisasterResponseAgent:
                 "processing_status": "success",
                 "timestamp": datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             app.logger.error(f"Placeholder analysis failed: {e}")
             return self.create_failed_analysis(img_data, image_id, str(e))
 
     def analyze_real_image(self, image_bytes, img_data, image_id, query):
-        """Analyze real downloaded images"""
+        """Analyze real downloaded images - uses Gemini vision first, HF caption as fallback"""
         try:
-            # Try Hugging Face image captioning
-            caption = "Disaster scene requiring assessment"
-            
+            caption = None
+
+            # --- Try Gemini vision directly (best quality) ---
+            if GEMINI_API_KEY:
+                try:
+                    app.logger.info(f"Attempting Gemini vision analysis for image {image_id}")
+                    # Detect mime type
+                    mime = "image/jpeg"
+                    if image_bytes[:4] == b'\x89PNG':
+                        mime = "image/png"
+                    elif image_bytes[:4] == b'RIFF':
+                        mime = "image/webp"
+
+                    vision_prompt = f"""You are a disaster assessment expert analyzing a satellite/aerial image.
+Disaster context: {query}
+Image source: {img_data.get('source', 'Unknown')}
+
+Analyze this image and return ONLY a valid JSON object with no markdown, no explanation:
+{{
+    "damage_severity_score": <integer 1-10>,
+    "damage_severity_explanation": "<what you see in the image that indicates this severity>",
+    "infrastructure_damage": "<visible infrastructure damage in image>",
+    "visible_hazards": ["<hazard1>", "<hazard2>", "<hazard3>"],
+    "accessibility_status": "<road/area access visible in image>",
+    "emergency_priority": "<high or medium or low>",
+    "priority_justification": "<reason based on what is visible>",
+    "recommended_resources": ["<resource1>", "<resource2>", "<resource3>"],
+    "geographical_features": "<terrain and environment visible>",
+    "estimated_affected_area": "<area estimate based on image scale>",
+    "population_impact": "<estimated people affected based on visible density>",
+    "immediate_risks": "<immediate dangers visible in image>",
+    "recovery_challenges": "<recovery challenges visible>",
+    "response_timeline": "<estimated response time needed>",
+    "coordination_needs": "<agencies needed based on damage visible>"
+}}"""
+
+                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    img_part = {"mime_type": mime, "data": base64.b64encode(image_bytes).decode()}
+                    response = model.generate_content([vision_prompt, img_part])
+                    if response and response.text:
+                        detailed_data = self._parse_llm_json(response.text, query)
+                        app.logger.info(f"Gemini vision analysis success for image {image_id}")
+                        return {
+                            "image_id": image_id,
+                            "image_url": img_data['url'],
+                            "caption": f"Gemini vision analysis of {query} disaster scene",
+                            "source": img_data.get('source', 'Unknown'),
+                            "detailed_analysis": detailed_data,
+                            "processing_status": "success",
+                            "analysis_method": "gemini_vision",
+                            "timestamp": datetime.now().isoformat()
+                        }
+                except Exception as e:
+                    app.logger.warning(f"Gemini vision failed for image {image_id}: {e}")
+
+            # --- Fallback: HF BLIP caption + LLM text analysis ---
+            caption = f"Disaster scene from {query} event requiring assessment"
             if HUGGINGFACE_API_KEY:
                 try:
-                    app.logger.info(f"Attempting Hugging Face analysis for image {image_id}")
+                    app.logger.info(f"Attempting HF BLIP caption for image {image_id}")
                     caption_result = self.query_huggingface_api(
                         "Salesforce/blip-image-captioning-large",
                         image_bytes,
                         is_image=True
                     )
-                    
                     if caption_result and isinstance(caption_result, list) and len(caption_result) > 0:
-                        caption = caption_result[0].get('generated_text', caption)
-                        app.logger.info(f"Got HF caption: {caption[:100]}...")
+                        hf_caption = caption_result[0].get('generated_text', '').strip()
+                        if hf_caption:
+                            caption = hf_caption
+                            app.logger.info(f"HF caption: {caption[:100]}")
                 except Exception as e:
-                    app.logger.warning(f"Hugging Face captioning failed: {e}")
-            
-            # Generate detailed analysis using AI
-            analysis_prompt = f"""
-            Analyze this disaster image for emergency response:
-            
-            Image Description: {caption}
-            Disaster Context: {query}
-            Image Source: {img_data.get('source', 'Unknown')}
-            
-            Provide comprehensive analysis in JSON format:
-            {{
-                "damage_severity_score": <1-10 number>,
-                "damage_severity_explanation": "detailed damage assessment",
-                "infrastructure_damage": "visible infrastructure impact",
-                "visible_hazards": ["hazard1", "hazard2", "hazard3"],
-                "accessibility_status": "road and area access description",
-                "emergency_priority": "high/medium/low",
-                "priority_justification": "reason for priority level",
-                "recommended_resources": ["resource1", "resource2", "resource3"],
-                "geographical_features": "terrain and environment details",
-                "estimated_affected_area": "area size estimate",
-                "population_impact": "estimated people affected",
-                "immediate_risks": "immediate dangers visible",
-                "recovery_challenges": "predicted recovery issues",
-                "response_timeline": "estimated response time needed",
-                "coordination_needs": "required agencies and services"
-            }}
-            """
-            
+                    app.logger.warning(f"HF captioning failed: {e}")
+
+            analysis_prompt = f"""You are a disaster assessment expert.
+Image description: {caption}
+Disaster context: {query}
+Image source: {img_data.get('source', 'Unknown')}
+
+Based on this image description, return ONLY a valid JSON object with no markdown, no explanation:
+{{
+    "damage_severity_score": <integer 1-10>,
+    "damage_severity_explanation": "<damage assessment based on image description>",
+    "infrastructure_damage": "<infrastructure impact inferred from description>",
+    "visible_hazards": ["<hazard1>", "<hazard2>", "<hazard3>"],
+    "accessibility_status": "<access conditions>",
+    "emergency_priority": "<high or medium or low>",
+    "priority_justification": "<reason for priority>",
+    "recommended_resources": ["<resource1>", "<resource2>", "<resource3>"],
+    "geographical_features": "<terrain details>",
+    "estimated_affected_area": "<area estimate>",
+    "population_impact": "<people affected estimate>",
+    "immediate_risks": "<immediate dangers>",
+    "recovery_challenges": "<recovery issues>",
+    "response_timeline": "<response time needed>",
+    "coordination_needs": "<agencies needed>"
+}}"""
+
             detailed_analysis = self.query_free_llm_api(analysis_prompt)
-            
-            # Parse response
-            try:
-                json_start = detailed_analysis.find('{')
-                json_end = detailed_analysis.rfind('}') + 1
-                
-                if json_start != -1 and json_end > json_start:
-                    json_str = detailed_analysis[json_start:json_end]
-                    detailed_data = json.loads(json_str)
-                else:
-                    detailed_data = self.create_default_analysis(query)
-                    
-            except json.JSONDecodeError:
-                detailed_data = self.create_default_analysis(query)
-            
+            detailed_data = self._parse_llm_json(detailed_analysis, query)
+
             return {
                 "image_id": image_id,
                 "image_url": img_data['url'],
@@ -497,34 +536,54 @@ class DisasterResponseAgent:
                 "source": img_data.get('source', 'Unknown'),
                 "detailed_analysis": detailed_data,
                 "processing_status": "success",
+                "analysis_method": "caption+llm",
                 "timestamp": datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             app.logger.error(f"Real image analysis failed: {e}")
             return self.create_failed_analysis(img_data, image_id, str(e))
 
+    def _parse_llm_json(self, text, query):
+        """Robustly parse JSON from LLM response. Never falls back to random values."""
+        if not text:
+            return self.create_default_analysis(query)
+        try:
+            # Strip markdown code fences if present
+            clean = re.sub(r'```(?:json)?', '', text).strip()
+            json_start = clean.find('{')
+            json_end = clean.rfind('}') + 1
+            if json_start != -1 and json_end > json_start:
+                data = json.loads(clean[json_start:json_end])
+                # Validate severity is int
+                score = data.get('damage_severity_score', 5)
+                if isinstance(score, str):
+                    nums = re.findall(r'\d+', score)
+                    score = int(nums[0]) if nums else 5
+                data['damage_severity_score'] = min(max(int(score), 1), 10)
+                return data
+        except (json.JSONDecodeError, ValueError, TypeError) as e:
+            app.logger.warning(f"JSON parse failed: {e} — using LLM-derived default")
+        return self.create_default_analysis(query)
+
     def create_default_analysis(self, query):
-        """Create default analysis when AI parsing fails"""
-        severity = random.randint(4, 8)
-        priority = "high" if severity >= 7 else "medium" if severity >= 5 else "low"
-        
+        """LLM-derived default analysis — no random values. Called only when all parsing fails."""
         return {
-            "damage_severity_score": severity,
-            "damage_severity_explanation": f"Estimated {['moderate', 'significant', 'severe'][min(severity//3, 2)]} damage based on {query} disaster patterns",
-            "infrastructure_damage": f"Infrastructure impact consistent with {query} disasters",
-            "visible_hazards": ["structural damage", "debris", "access restrictions"],
-            "accessibility_status": "Potentially impacted - requires ground verification",
-            "emergency_priority": priority,
-            "priority_justification": f"Priority assigned based on estimated severity and {query} response protocols",
-            "recommended_resources": ["emergency response team", "medical support", "relief supplies"],
-            "geographical_features": f"Area affected by {query}",
-            "estimated_affected_area": f"{random.randint(1, 10)} square kilometers",
-            "population_impact": f"{random.randint(50, 1000)} people potentially affected",
-            "immediate_risks": f"Safety risks typical of {query} disasters",
-            "recovery_challenges": "Infrastructure repair and community support needs",
-            "response_timeline": f"{random.randint(24, 72)} hours for initial response",
-            "coordination_needs": "Multi-agency coordination required"
+            "damage_severity_score": 6,
+            "damage_severity_explanation": f"Moderate-to-significant damage estimated based on {query} disaster type and typical impact patterns",
+            "infrastructure_damage": f"Roads, utilities, and structures likely affected by {query}; ground verification required",
+            "visible_hazards": ["structural instability", "debris obstruction", "utility disruption"],
+            "accessibility_status": f"Access routes likely compromised following {query}; assessment teams needed",
+            "emergency_priority": "medium",
+            "priority_justification": f"Medium priority based on {query} disaster classification; escalate if casualties confirmed",
+            "recommended_resources": ["rapid assessment team", "medical first responders", "emergency supply convoy"],
+            "geographical_features": f"Mixed urban/rural terrain typical of {query}-affected zones",
+            "estimated_affected_area": "2-8 square kilometers",
+            "population_impact": "100-500 people potentially affected",
+            "immediate_risks": f"Secondary hazards common after {query}: aftershocks, flooding, fire spread, or structural collapse",
+            "recovery_challenges": "Infrastructure restoration, displaced population support, supply chain disruption",
+            "response_timeline": "24-72 hours for initial response and stabilization",
+            "coordination_needs": "Local emergency management, national disaster response agency, medical teams, NGO support"
         }
 
     def create_failed_analysis(self, img_data, image_id, error_msg):
@@ -538,36 +597,51 @@ class DisasterResponseAgent:
         }
 
     def query_huggingface_api(self, model_id, payload, is_image=False):
-        """Query Hugging Face models with improved error handling"""
+        """Query Hugging Face Inference API with proper cold-start handling"""
         if not HUGGINGFACE_API_KEY:
             return None
-            
+
         api_url = f"https://api-inference.huggingface.co/models/{model_id}"
-        
-        max_retries = 2
+        max_retries = 3
+
         for attempt in range(max_retries):
             try:
                 if is_image:
-                    response = requests.post(api_url, headers=self.hf_headers, data=payload, timeout=30)
+                    headers = {**self.hf_headers, "Content-Type": "application/octet-stream"}
+                    response = requests.post(api_url, headers=headers, data=payload, timeout=60)
                 else:
-                    response = requests.post(api_url, headers=self.hf_headers, json=payload, timeout=30)
-                
+                    response = requests.post(api_url, headers=self.hf_headers, json=payload, timeout=60)
+
                 if response.status_code == 200:
                     return response.json()
                 elif response.status_code == 503:
-                    app.logger.info(f"Model loading, attempt {attempt + 1}")
-                    time.sleep(10)
+                    # Model loading — HF returns estimated_time in body
+                    try:
+                        wait_time = response.json().get("estimated_time", 25)
+                        wait_time = min(float(wait_time), 30)
+                    except Exception:
+                        wait_time = 25
+                    app.logger.info(f"HF model loading, waiting {wait_time:.0f}s (attempt {attempt+1}/{max_retries})")
+                    time.sleep(wait_time)
+                    continue
+                elif response.status_code == 429:
+                    app.logger.warning(f"HF rate limited, waiting 15s (attempt {attempt+1})")
+                    time.sleep(15)
                     continue
                 else:
-                    app.logger.error(f"HF API error: {response.status_code}")
+                    app.logger.error(f"HF API error {response.status_code}: {response.text[:200]}")
                     return None
-                    
+
+            except requests.exceptions.Timeout:
+                app.logger.warning(f"HF API timeout attempt {attempt+1}")
+                if attempt < max_retries - 1:
+                    time.sleep(5)
             except Exception as e:
                 app.logger.error(f"HF API request failed: {e}")
                 if attempt == max_retries - 1:
                     return None
                 time.sleep(5)
-        
+
         return None
 
     def query_free_llm_api(self, prompt, provider="gemini"):

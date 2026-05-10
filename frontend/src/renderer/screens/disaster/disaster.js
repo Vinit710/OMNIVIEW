@@ -145,35 +145,174 @@ function hideBrief() {
   if (card) card.style.display = "none";
 }
 function generateReport() {
-  const e = searchInput.value.trim();
-  e
-    ? (showReportSection(),
-      (reportContainer.innerHTML =
-        '<div class="loading">Generating report...</div>'),
-      addLog("info", `Generating report for "${e}"`),
-      fetch(API_CONFIG.getUrl("GENERATE_REPORT"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: e }),
-      })
-        .then((e) => e.json())
-        .then((e) => {
-          if (e.error)
-            return (
-              (reportContainer.innerHTML = `<div class="error">${e.error}</div>`),
-              void addLog("error", `Report generation failed: ${e.error}`)
-            );
-          const t = markdownToHtml(e.report);
-          ((reportContainer.innerHTML = `<div class="report-content">${t}</div>`),
-            addLog("info", "Report generated successfully"));
-        })
-        .catch((e) => {
-          ((reportContainer.innerHTML =
-            '<div class="error">Error generating report. Please try again.</div>'),
-            addLog("error", "Error generating report: " + e.message),
-            console.error("Report error:", e));
-        }))
-    : addLog("error", "Please enter a search query to generate a report.");
+  const query = searchInput.value.trim();
+  if (!query) {
+    addLog("error", "Please enter a search query to generate a report.");
+    return;
+  }
+
+  showReportSection();
+  reportContainer.innerHTML = `
+    <div class="report-progress">
+      <div class="report-progress-steps">
+        <div class="rp-step rp-active" id="rpStep1">📰 Fetching news…</div>
+        <div class="rp-step" id="rpStep2">🖼️ Fetching images…</div>
+        <div class="rp-step" id="rpStep3">🔍 Analyzing with AI…</div>
+        <div class="rp-step" id="rpStep4">📊 Generating charts…</div>
+        <div class="rp-step" id="rpStep5">📋 Writing report…</div>
+      </div>
+    </div>`;
+  addLog("info", `Generating report for "${query}"`);
+
+  // Animate progress steps
+  let stepIdx = 1;
+  const stepTimer = setInterval(() => {
+    stepIdx++;
+    if (stepIdx > 5) { clearInterval(stepTimer); return; }
+    for (let i = 1; i <= 5; i++) {
+      const el = document.getElementById(`rpStep${i}`);
+      if (!el) continue;
+      el.classList.toggle("rp-active", i === stepIdx);
+      el.classList.toggle("rp-done", i < stepIdx);
+    }
+  }, 8000);
+
+  fetch(API_CONFIG.getUrl("GENERATE_REPORT"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  })
+    .then((r) => r.json())
+    .then((data) => {
+      clearInterval(stepTimer);
+      if (data.error) {
+        reportContainer.innerHTML = `<div class="error">${escapeHtml(data.error)}</div>`;
+        addLog("error", `Report generation failed: ${data.error}`);
+        return;
+      }
+      renderFullReport(data, query);
+      addLog("info", `Report generated — ${data.analysis_summary?.successful_analyses || 0} images analysed, avg severity ${data.analysis_summary?.average_severity || 'N/A'}/10`);
+    })
+    .catch((err) => {
+      clearInterval(stepTimer);
+      reportContainer.innerHTML = '<div class="error">Error generating report. Please try again.</div>';
+      addLog("error", "Error generating report: " + err.message);
+    });
+}
+
+function renderFullReport(data, query) {
+  const summary = data.analysis_summary || {};
+  const charts = data.charts || {};
+  const analyses = (data.raw_data && data.raw_data.successful_image_analyses) || [];
+  const reportHtml = markdownToHtml(data.report || "");
+
+  // ── Summary bar ──
+  const severityColor = summary.average_severity >= 7 ? "#ef4444" : summary.average_severity >= 5 ? "#f59e0b" : "#22c55e";
+  const summaryBar = `
+    <div class="report-summary-bar">
+      <div class="rsb-tile">
+        <div class="rsb-label">Avg Severity</div>
+        <div class="rsb-value" style="color:${severityColor}">${summary.average_severity || "—"}<span class="rsb-unit">/10</span></div>
+      </div>
+      <div class="rsb-tile">
+        <div class="rsb-label">Images Analysed</div>
+        <div class="rsb-value">${summary.successful_analyses || 0}<span class="rsb-unit">/${summary.images_processed || 0}</span></div>
+      </div>
+      <div class="rsb-tile">
+        <div class="rsb-label">High Priority</div>
+        <div class="rsb-value" style="color:#ef4444">${summary.high_priority_areas || 0}</div>
+      </div>
+      <div class="rsb-tile">
+        <div class="rsb-label">Confidence</div>
+        <div class="rsb-value">${summary.confidence_level || "—"}</div>
+      </div>
+      <div class="rsb-tile">
+        <div class="rsb-label">News Sources</div>
+        <div class="rsb-value">${summary.news_articles_found || 0}</div>
+      </div>
+    </div>`;
+
+  // ── Charts section ──
+  let chartsHtml = "";
+  const chartDefs = [
+    { key: "damage_severity", label: "Damage Severity by Location" },
+    { key: "priority_distribution", label: "Emergency Priority Distribution" },
+    { key: "resource_allocation", label: "Recommended Resource Allocation" },
+  ];
+  const availableCharts = chartDefs.filter(c => charts[c.key]);
+  if (availableCharts.length > 0) {
+    chartsHtml = `
+      <div class="report-section-heading">📊 Assessment Charts</div>
+      <div class="report-charts-grid">
+        ${availableCharts.map(c => `
+          <div class="report-chart-card">
+            <div class="report-chart-label">${c.label}</div>
+            <img src="${charts[c.key]}" alt="${c.label}" class="report-chart-img" loading="lazy" />
+          </div>`).join("")}
+      </div>`;
+  } else {
+    chartsHtml = `<div class="report-no-charts">Charts unavailable — insufficient analysis data.</div>`;
+  }
+
+  // ── Image analyses grid ──
+  let imagesHtml = "";
+  if (analyses.length > 0) {
+    imagesHtml = `
+      <div class="report-section-heading">🛰️ Image Analysis Results</div>
+      <div class="report-images-grid">
+        ${analyses.map(img => renderImageAnalysisCard(img)).join("")}
+      </div>`;
+  }
+
+  // ── Main report text ──
+  const reportTextHtml = `
+    <div class="report-section-heading">📋 Official Assessment Report</div>
+    <div class="report-content">${reportHtml}</div>`;
+
+  reportContainer.innerHTML = summaryBar + chartsHtml + imagesHtml + reportTextHtml;
+}
+
+function renderImageAnalysisCard(img) {
+  const a = img.detailed_analysis || {};
+  const severity = a.damage_severity_score || "—";
+  const priority = (a.emergency_priority || "unknown").toLowerCase();
+  const priorityColor = priority === "high" ? "#ef4444" : priority === "medium" ? "#f59e0b" : "#22c55e";
+  const caption = escapeHtml(img.caption || `Assessment Point ${img.image_id}`);
+  const source = escapeHtml(img.source || "");
+  const method = img.analysis_method === "gemini_vision" ? "Gemini Vision" : img.analysis_method === "caption+llm" ? "Caption + LLM" : "AI Analysis";
+
+  // Image display — handle both URL and base64
+  const imgSrc = img.image_url || "";
+  const imgTag = imgSrc
+    ? `<img src="${escapeHtml(imgSrc)}" alt="${caption}" class="ria-img" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="ria-img-fallback" style="display:none">🛰️ Image unavailable</div>`
+    : `<div class="ria-img-fallback">🛰️ No image</div>`;
+
+  const hazards = Array.isArray(a.visible_hazards) ? a.visible_hazards.slice(0, 3) : [];
+  const resources = Array.isArray(a.recommended_resources) ? a.recommended_resources.slice(0, 3) : [];
+
+  return `
+    <div class="ria-card">
+      <div class="ria-img-wrap">${imgTag}</div>
+      <div class="ria-body">
+        <div class="ria-header">
+          <span class="ria-id">Point ${img.image_id}</span>
+          <span class="ria-method">${method}</span>
+          <span class="ria-priority" style="color:${priorityColor};border-color:${priorityColor}">${priority.toUpperCase()}</span>
+        </div>
+        <div class="ria-severity">
+          <span class="ria-sev-label">Severity</span>
+          <span class="ria-sev-bar-wrap"><span class="ria-sev-bar" style="width:${Math.min((severity/10)*100,100)}%;background:${priorityColor}"></span></span>
+          <span class="ria-sev-num" style="color:${priorityColor}">${severity}/10</span>
+        </div>
+        <div class="ria-caption">${caption}</div>
+        ${a.damage_severity_explanation ? `<div class="ria-detail"><b>Assessment:</b> ${escapeHtml(a.damage_severity_explanation)}</div>` : ""}
+        ${a.infrastructure_damage ? `<div class="ria-detail"><b>Infrastructure:</b> ${escapeHtml(a.infrastructure_damage)}</div>` : ""}
+        ${hazards.length ? `<div class="ria-tags">${hazards.map(h => `<span class="ria-tag ria-tag-hazard">${escapeHtml(h)}</span>`).join("")}</div>` : ""}
+        ${resources.length ? `<div class="ria-tags">${resources.map(r => `<span class="ria-tag ria-tag-resource">${escapeHtml(r)}</span>`).join("")}</div>` : ""}
+        ${a.response_timeline ? `<div class="ria-timeline">⏱ ${escapeHtml(a.response_timeline)}</div>` : ""}
+        ${source ? `<div class="ria-source">${source}</div>` : ""}
+      </div>
+    </div>`;
 }
 const searchContainer = document.querySelector(".search-container");
 function loadDefaultContent() {
