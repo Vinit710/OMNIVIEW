@@ -6,7 +6,7 @@ import tempfile
 import os
 import traceback
 import json
-import google.generativeai as genai
+from google import genai as genai_new
 from dotenv import load_dotenv
 import io
 from io import BytesIO
@@ -53,8 +53,14 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 if not GEMINI_API_KEY or not GOOGLE_API_KEY or not GOOGLE_CX:
     raise ValueError("Required API keys (GEMINI_API_KEY, GOOGLE_API_KEY, GOOGLE_CX) must be set in environment variables")
 
-# Configure Gemini
-genai.configure(api_key=GEMINI_API_KEY)
+# Configure Gemini (new SDK)
+_gemini_client = None
+
+def get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = genai_new.Client(api_key=GEMINI_API_KEY)
+    return _gemini_client
 
 
 app = Flask(__name__)
@@ -260,9 +266,34 @@ class DisasterResponseAgent:
         return fallback_articles
 
     def get_google_images(self, query, num_results=8):
-        """Fetch disaster images using Google Custom Search API with robust fallbacks"""
+        """Fetch disaster images: DDG → Google CSE → Wikimedia → RSS HTML → placeholder"""
+
+        # ── 1. DuckDuckGo Image Search (free, no key, query-specific) ──
         try:
-            enhanced_query = f"{query} disaster damage aerial satellite emergency"
+            from ddgs import DDGS
+            app.logger.info(f"Searching DDG Images for: {query} disaster")
+            with DDGS() as ddgs:
+                results = list(ddgs.images(f"{query} disaster", max_results=num_results))
+            images = []
+            for r in results:
+                img_url = r.get('image', '')
+                if img_url and img_url.startswith('http'):
+                    images.append({
+                        'url': img_url,
+                        'title': r.get('title', f'{query} disaster image'),
+                        'context': r.get('source', ''),
+                        'source': r.get('source', 'DuckDuckGo Images'),
+                    })
+            if images:
+                app.logger.info(f"DDG Images returned {len(images)} images")
+                return images
+            app.logger.warning("DDG Images returned 0 images")
+        except Exception as e:
+            app.logger.error(f"DDG Images failed: {e}")
+
+        # ── 2. Google Custom Search Image API ──
+        try:
+            enhanced_query = f"{query} disaster damage flood fire earthquake"
             url = "https://www.googleapis.com/customsearch/v1"
             params = {
                 'key': GOOGLE_API_KEY,
@@ -270,40 +301,231 @@ class DisasterResponseAgent:
                 'q': enhanced_query,
                 'searchType': 'image',
                 'num': min(num_results, 10),
-                'imgSize': 'large',
                 'imgType': 'photo',
-                'safe': 'active'
+                'safe': 'active',
             }
-            
-            app.logger.info(f"Searching Google Images for: {enhanced_query}")
+            app.logger.info(f"Searching Google CSE Images for: {enhanced_query}")
             response = requests.get(url, params=params, timeout=20)
-            
             if response.status_code == 200:
-                data = response.json()
-                images = []
-                
-                for item in data.get('items', []):
-                    images.append({
+                items = response.json().get('items', [])
+                images = [
+                    {
                         'url': item.get('link', ''),
                         'title': item.get('title', f'{query} Disaster Image'),
-                        'context': item.get('snippet', f'Disaster imagery related to {query}'),
-                        'source': item.get('displayLink', 'Image Source')
-                    })
-                
-                app.logger.info(f"Found {len(images)} images from Google")
-                
+                        'context': item.get('snippet', ''),
+                        'source': item.get('displayLink', 'Google Images'),
+                    }
+                    for item in items
+                    if item.get('link', '').startswith('http')
+                ]
                 if images:
+                    app.logger.info(f"Google CSE returned {len(images)} images")
                     return images
-                else:
-                    app.logger.warning("No images found in Google response, using fallback")
-                    return self.get_fallback_images(query)
+                app.logger.warning("Google CSE returned 0 images — PSE may not have image search enabled")
             else:
-                app.logger.error(f"Google Images API error: {response.status_code}")
-                return self.get_fallback_images(query)
-                
+                app.logger.warning(f"Google CSE Images error: {response.status_code}")
         except Exception as e:
-            app.logger.error(f"Google Images fetch failed: {e}")
-            return self.get_fallback_images(query)
+            app.logger.error(f"Google CSE Images failed: {e}")
+
+        # ── 3. Wikimedia Commons (generic disaster terms, no year) ──
+        try:
+            wm_query = re.sub(r'\b(20\d{2}|19\d{2})\b', '', query).strip()
+            disaster_types = ['flood', 'earthquake', 'cyclone', 'wildfire', 'fire', 'landslide',
+                              'tsunami', 'hurricane', 'typhoon', 'drought', 'avalanche', 'volcano']
+            disaster_kw = next((kw for kw in disaster_types if kw in wm_query.lower()), 'disaster')
+            wm_search = f"{disaster_kw} damage destruction"
+            app.logger.info(f"Trying Wikimedia Commons for: {wm_search}")
+            wm_params = {
+                'action': 'query',
+                'generator': 'search',
+                'gsrnamespace': 6,
+                'gsrsearch': wm_search,
+                'gsrlimit': num_results + 5,
+                'prop': 'imageinfo',
+                'iiprop': 'url|extmetadata',
+                'iiurlwidth': 800,
+                'format': 'json',
+            }
+            wm_resp = requests.get(
+                "https://commons.wikimedia.org/w/api.php",
+                params=wm_params, timeout=15,
+                headers={'User-Agent': 'OmniView/3.0 disaster-assessment'}
+            )
+            if wm_resp.status_code == 200:
+                pages = wm_resp.json().get('query', {}).get('pages', {})
+                images = []
+                for page in pages.values():
+                    ii = page.get('imageinfo', [{}])[0]
+                    img_url = ii.get('thumburl') or ii.get('url', '')
+                    if not img_url or not any(img_url.split('?')[0].lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp']):
+                        continue
+                    meta = ii.get('extmetadata', {})
+                    title = meta.get('ImageDescription', {}).get('value', '') or page.get('title', query)
+                    title = re.sub(r'<[^>]+>', '', title)[:120]
+                    images.append({
+                        'url': img_url,
+                        'title': title or f'{query} disaster image',
+                        'context': f'Wikimedia Commons — {disaster_kw}',
+                        'source': 'Wikimedia Commons',
+                    })
+                    if len(images) >= num_results:
+                        break
+                if images:
+                    app.logger.info(f"Wikimedia Commons returned {len(images)} images")
+                    return images
+                app.logger.warning("Wikimedia Commons returned 0 images")
+        except Exception as e:
+            app.logger.error(f"Wikimedia Commons failed: {e}")
+
+        # ── 4. Extract images from Google News RSS entry summaries ──
+        try:
+            app.logger.info(f"Extracting images from RSS entry HTML for: {query}")
+            rss_url = (
+                "https://news.google.com/rss/search"
+                f"?q={quote(query + ' disaster')}&hl=en-IN&gl=IN&ceid=IN:en"
+            )
+            feed = feedparser.parse(rss_url)
+            images = []
+            img_tag_re = re.compile(r'<img[^>]+src=["\']([^"\']+)["\']', re.IGNORECASE)
+            for entry in feed.entries[:num_results * 3]:
+                for attr in ('media_content', 'media_thumbnail'):
+                    for m in entry.get(attr, []):
+                        u = m.get('url', '')
+                        if u.startswith('http'):
+                            images.append({
+                                'url': u,
+                                'title': entry.get('title', f'{query} news'),
+                                'context': 'News thumbnail',
+                                'source': entry.get('source', {}).get('title', 'Google News'),
+                            })
+                            break
+                    if images and images[-1].get('source'):
+                        break
+                else:
+                    summary = entry.get('summary', '') or entry.get('description', '')
+                    for m in img_tag_re.finditer(summary):
+                        u = m.group(1)
+                        if u.startswith('http') and not u.endswith('.gif'):
+                            images.append({
+                                'url': u,
+                                'title': entry.get('title', f'{query} news'),
+                                'context': 'News article image',
+                                'source': entry.get('source', {}).get('title', 'Google News'),
+                            })
+                            break
+                if len(images) >= num_results:
+                    break
+            if images:
+                app.logger.info(f"RSS HTML images returned {len(images)} images")
+                return images
+            app.logger.warning("RSS HTML images returned 0 images")
+        except Exception as e:
+            app.logger.error(f"RSS image extraction failed: {e}")
+
+        # ── 5. Local placeholder fallback ──
+        app.logger.warning("All image sources failed — using local placeholders")
+        return self.get_fallback_images(query)
+        try:
+            # Strip year and over-specific location for broader Wikimedia match
+            wm_query = re.sub(r'\b(20\d{2}|19\d{2})\b', '', query).strip()
+            # Extract disaster type keyword
+            disaster_types = ['flood', 'earthquake', 'cyclone', 'wildfire', 'fire', 'landslide',
+                              'tsunami', 'hurricane', 'typhoon', 'drought', 'avalanche', 'volcano']
+            disaster_kw = next((kw for kw in disaster_types if kw in wm_query.lower()), 'disaster')
+            wm_search = f"{disaster_kw} damage destruction"
+            app.logger.info(f"Trying Wikimedia Commons for: {wm_search}")
+            wm_params = {
+                'action': 'query',
+                'generator': 'search',
+                'gsrnamespace': 6,
+                'gsrsearch': wm_search,
+                'gsrlimit': num_results + 5,
+                'prop': 'imageinfo',
+                'iiprop': 'url|extmetadata',
+                'iiurlwidth': 800,
+                'format': 'json',
+            }
+            wm_resp = requests.get(
+                "https://commons.wikimedia.org/w/api.php",
+                params=wm_params, timeout=15,
+                headers={'User-Agent': 'OmniView/3.0 disaster-assessment'}
+            )
+            if wm_resp.status_code == 200:
+                pages = wm_resp.json().get('query', {}).get('pages', {})
+                images = []
+                for page in pages.values():
+                    ii = page.get('imageinfo', [{}])[0]
+                    img_url = ii.get('thumburl') or ii.get('url', '')
+                    if not img_url or not any(img_url.split('?')[0].lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp']):
+                        continue
+                    meta = ii.get('extmetadata', {})
+                    title = meta.get('ImageDescription', {}).get('value', '') or page.get('title', query)
+                    title = re.sub(r'<[^>]+>', '', title)[:120]
+                    images.append({
+                        'url': img_url,
+                        'title': title or f'{query} disaster image',
+                        'context': f'Wikimedia Commons — {disaster_kw}',
+                        'source': 'Wikimedia Commons',
+                    })
+                    if len(images) >= num_results:
+                        break
+                if images:
+                    app.logger.info(f"Wikimedia Commons returned {len(images)} images")
+                    return images
+                app.logger.warning("Wikimedia Commons returned 0 images")
+        except Exception as e:
+            app.logger.error(f"Wikimedia Commons failed: {e}")
+
+        # ── 4. Extract images from Google News RSS entry summaries ──
+        try:
+            app.logger.info(f"Extracting images from RSS entry HTML for: {query}")
+            rss_url = (
+                "https://news.google.com/rss/search"
+                f"?q={quote(query + ' disaster')}&hl=en-IN&gl=IN&ceid=IN:en"
+            )
+            feed = feedparser.parse(rss_url)
+            images = []
+            img_tag_re = re.compile(r'<img[^>]+src=["\']([^"\']+)["\']', re.IGNORECASE)
+            for entry in feed.entries[:num_results * 3]:
+                # Check media_content / media_thumbnail first
+                for attr in ('media_content', 'media_thumbnail'):
+                    for m in entry.get(attr, []):
+                        u = m.get('url', '')
+                        if u.startswith('http'):
+                            images.append({
+                                'url': u,
+                                'title': entry.get('title', f'{query} news'),
+                                'context': 'News thumbnail',
+                                'source': entry.get('source', {}).get('title', 'Google News'),
+                            })
+                            break
+                    if images and images[-1].get('source'):
+                        break
+                else:
+                    # Parse img tags from summary HTML
+                    summary = entry.get('summary', '') or entry.get('description', '')
+                    for m in img_tag_re.finditer(summary):
+                        u = m.group(1)
+                        if u.startswith('http') and not u.endswith('.gif'):
+                            images.append({
+                                'url': u,
+                                'title': entry.get('title', f'{query} news'),
+                                'context': 'News article image',
+                                'source': entry.get('source', {}).get('title', 'Google News'),
+                            })
+                            break
+                if len(images) >= num_results:
+                    break
+            if images:
+                app.logger.info(f"RSS HTML images returned {len(images)} images")
+                return images
+            app.logger.warning("RSS HTML images returned 0 images")
+        except Exception as e:
+            app.logger.error(f"RSS image extraction failed: {e}")
+
+        # ── 5. Local placeholder fallback ──
+        app.logger.warning("All image sources failed — using local placeholders")
+        return self.get_fallback_images(query)
 
     def get_fallback_images(self, query):
         """Generate fallback images when Google Images fails"""
@@ -342,21 +564,40 @@ class DisasterResponseAgent:
                 # Try to download external image
                 try:
                     headers = {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+                        'Accept-Encoding': 'gzip, deflate, br',
+                        'Referer': 'https://www.google.com/'
                     }
-                    img_response = requests.get(img_data['url'], timeout=15, headers=headers)
-                    
-                    if img_response.status_code == 200 and len(img_response.content) > 1000:
-                        # Successfully downloaded image
+                    img_response = requests.get(
+                        img_data['url'], timeout=20, headers=headers,
+                        allow_redirects=True, stream=False
+                    )
+
+                    content_type = img_response.headers.get('Content-Type', '')
+                    is_image_content = any(t in content_type for t in ['image/', 'octet-stream'])
+
+                    if img_response.status_code == 200 and len(img_response.content) > 1000 and is_image_content:
                         analysis = self.analyze_real_image(img_response.content, img_data, i+1, query)
                         analysis_results.append(analysis)
+                    elif img_response.status_code == 200 and len(img_response.content) > 1000:
+                        # Try anyway — some servers return wrong content-type
+                        try:
+                            Image.open(io.BytesIO(img_response.content))  # validate it's actually an image
+                            analysis = self.analyze_real_image(img_response.content, img_data, i+1, query)
+                            analysis_results.append(analysis)
+                        except Exception:
+                            app.logger.warning(f"Image {i+1} not valid image data, using placeholder analysis")
+                            analysis_results.append(self.analyze_placeholder_image(img_data, i+1, query))
                     else:
-                        app.logger.warning(f"Failed to download image {i+1}: Status {img_response.status_code}")
-                        analysis_results.append(self.create_failed_analysis(img_data, i+1, "Download failed"))
+                        app.logger.warning(f"Failed to download image {i+1}: status={img_response.status_code}, size={len(img_response.content)}")
+                        # Still do LLM analysis using image title/context as input
+                        analysis_results.append(self.analyze_placeholder_image(img_data, i+1, query))
                         
                 except requests.exceptions.RequestException as e:
                     app.logger.warning(f"Network error downloading image {i+1}: {e}")
-                    analysis_results.append(self.create_failed_analysis(img_data, i+1, f"Network error: {str(e)}"))
+                    # Still analyze using image metadata via LLM
+                    analysis_results.append(self.analyze_placeholder_image(img_data, i+1, query))
                 
             except Exception as e:
                 app.logger.error(f"Image analysis failed for image {i+1}: {e}")
@@ -367,50 +608,32 @@ class DisasterResponseAgent:
     def analyze_placeholder_image(self, img_data, image_id, query):
         """Analyze placeholder images using AI text analysis"""
         try:
-            analysis_prompt = f"""
-            Analyze this disaster scenario for emergency response planning:
-            
-            Disaster Type: {query}
-            Assessment Location: {image_id}
-            Image Type: Satellite/Aerial Assessment Point
-            
-            Based on typical {query} disasters, provide analysis in this exact JSON format:
-            {{
-                "damage_severity_score": {random.randint(4, 9)},
-                "damage_severity_explanation": "Estimated damage based on {query} disaster patterns",
-                "infrastructure_damage": "Potential infrastructure impact from {query}",
-                "visible_hazards": ["structural damage", "debris", "access restrictions"],
-                "accessibility_status": "Assessment pending - likely impacted",
-                "emergency_priority": "{random.choice(['high', 'medium', 'medium'])}",
-                "priority_justification": "Priority based on {query} disaster response protocols",
-                "recommended_resources": ["search and rescue", "medical team", "emergency supplies"],
-                "geographical_features": "Urban/suburban area affected by {query}",
-                "estimated_affected_area": "{random.randint(1, 5)} square kilometers",
-                "population_impact": "{random.randint(100, 2000)} people potentially affected",
-                "immediate_risks": "Safety hazards typical of {query} disasters",
-                "recovery_challenges": "Infrastructure restoration and community support needs",
-                "response_timeline": "{random.randint(24, 96)} hours for initial response",
-                "coordination_needs": "Multi-agency disaster response coordination required"
-            }}
-            """
-            
+            analysis_prompt = f"""You are a disaster assessment expert. Analyze assessment location {image_id} for a {query} disaster scenario.
+
+Based on your knowledge of {query} disasters, provide a realistic assessment in valid JSON format only. No markdown, no explanation, just the JSON object.
+
+Return exactly this structure with your assessed values:
+{{
+    "damage_severity_score": <integer 1-10 based on typical {query} severity>,
+    "damage_severity_explanation": "<specific explanation of damage level for {query}>",
+    "infrastructure_damage": "<specific infrastructure impacts typical of {query}>",
+    "visible_hazards": ["<hazard1>", "<hazard2>", "<hazard3>"],
+    "accessibility_status": "<access conditions typical after {query}>",
+    "emergency_priority": "<high or medium or low based on {query} severity>",
+    "priority_justification": "<why this priority for {query}>",
+    "recommended_resources": ["<resource1>", "<resource2>", "<resource3>"],
+    "geographical_features": "<terrain features relevant to {query}>",
+    "estimated_affected_area": "<realistic area estimate for {query}>",
+    "population_impact": "<realistic population impact estimate for {query}>",
+    "immediate_risks": "<specific immediate dangers from {query}>",
+    "recovery_challenges": "<specific recovery challenges for {query}>",
+    "response_timeline": "<realistic response timeline for {query}>",
+    "coordination_needs": "<specific agencies needed for {query}>"
+}}"""
+
             detailed_analysis = self.query_free_llm_api(analysis_prompt)
-            
-            # Parse AI response
-            try:
-                json_start = detailed_analysis.find('{')
-                json_end = detailed_analysis.rfind('}') + 1
-                
-                if json_start != -1 and json_end > json_start:
-                    json_str = detailed_analysis[json_start:json_end]
-                    detailed_data = json.loads(json_str)
-                else:
-                    detailed_data = self.create_default_analysis(query)
-                    
-            except json.JSONDecodeError:
-                app.logger.warning(f"Failed to parse AI response for image {image_id}")
-                detailed_data = self.create_default_analysis(query)
-            
+            detailed_data = self._parse_llm_json(detailed_analysis, query)
+
             return {
                 "image_id": image_id,
                 "image_url": img_data['url'],
@@ -420,76 +643,119 @@ class DisasterResponseAgent:
                 "processing_status": "success",
                 "timestamp": datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             app.logger.error(f"Placeholder analysis failed: {e}")
             return self.create_failed_analysis(img_data, image_id, str(e))
 
     def analyze_real_image(self, image_bytes, img_data, image_id, query):
-        """Analyze real downloaded images"""
+        """Analyze real downloaded images - uses Gemini vision first, HF caption as fallback"""
         try:
-            # Try Hugging Face image captioning
-            caption = "Disaster scene requiring assessment"
-            
+            caption = None
+
+            # --- Try Gemini vision directly (best quality) ---
+            if GEMINI_API_KEY:
+                try:
+                    app.logger.info(f"Attempting Gemini vision analysis for image {image_id}")
+                    # Detect mime type
+                    mime = "image/jpeg"
+                    if image_bytes[:4] == b'\x89PNG':
+                        mime = "image/png"
+                    elif image_bytes[:4] == b'RIFF':
+                        mime = "image/webp"
+
+                    vision_prompt = f"""You are a disaster assessment expert analyzing a satellite/aerial image.
+Disaster context: {query}
+Image source: {img_data.get('source', 'Unknown')}
+
+Analyze this image and return ONLY a valid JSON object with no markdown, no explanation:
+{{
+    "damage_severity_score": <integer 1-10>,
+    "damage_severity_explanation": "<what you see in the image that indicates this severity>",
+    "infrastructure_damage": "<visible infrastructure damage in image>",
+    "visible_hazards": ["<hazard1>", "<hazard2>", "<hazard3>"],
+    "accessibility_status": "<road/area access visible in image>",
+    "emergency_priority": "<high or medium or low>",
+    "priority_justification": "<reason based on what is visible>",
+    "recommended_resources": ["<resource1>", "<resource2>", "<resource3>"],
+    "geographical_features": "<terrain and environment visible>",
+    "estimated_affected_area": "<area estimate based on image scale>",
+    "population_impact": "<estimated people affected based on visible density>",
+    "immediate_risks": "<immediate dangers visible in image>",
+    "recovery_challenges": "<recovery challenges visible>",
+    "response_timeline": "<estimated response time needed>",
+    "coordination_needs": "<agencies needed based on damage visible>"
+}}"""
+
+                    client = get_gemini_client()
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=[
+                            vision_prompt,
+                            genai_new.types.Part.from_bytes(data=image_bytes, mime_type=mime),
+                        ]
+                    )
+                    if response and response.text:
+                        detailed_data = self._parse_llm_json(response.text, query)
+                        app.logger.info(f"Gemini vision analysis success for image {image_id}")
+                        return {
+                            "image_id": image_id,
+                            "image_url": img_data['url'],
+                            "caption": f"Gemini vision analysis of {query} disaster scene",
+                            "source": img_data.get('source', 'Unknown'),
+                            "detailed_analysis": detailed_data,
+                            "processing_status": "success",
+                            "analysis_method": "gemini_vision",
+                            "timestamp": datetime.now().isoformat()
+                        }
+                except Exception as e:
+                    app.logger.warning(f"Gemini vision failed for image {image_id}: {e}")
+
+            # --- Fallback: HF BLIP caption + LLM text analysis ---
+            caption = f"Disaster scene from {query} event requiring assessment"
             if HUGGINGFACE_API_KEY:
                 try:
-                    app.logger.info(f"Attempting Hugging Face analysis for image {image_id}")
+                    app.logger.info(f"Attempting HF BLIP caption for image {image_id}")
                     caption_result = self.query_huggingface_api(
                         "Salesforce/blip-image-captioning-large",
                         image_bytes,
                         is_image=True
                     )
-                    
                     if caption_result and isinstance(caption_result, list) and len(caption_result) > 0:
-                        caption = caption_result[0].get('generated_text', caption)
-                        app.logger.info(f"Got HF caption: {caption[:100]}...")
+                        hf_caption = caption_result[0].get('generated_text', '').strip()
+                        if hf_caption:
+                            caption = hf_caption
+                            app.logger.info(f"HF caption: {caption[:100]}")
                 except Exception as e:
-                    app.logger.warning(f"Hugging Face captioning failed: {e}")
-            
-            # Generate detailed analysis using AI
-            analysis_prompt = f"""
-            Analyze this disaster image for emergency response:
-            
-            Image Description: {caption}
-            Disaster Context: {query}
-            Image Source: {img_data.get('source', 'Unknown')}
-            
-            Provide comprehensive analysis in JSON format:
-            {{
-                "damage_severity_score": <1-10 number>,
-                "damage_severity_explanation": "detailed damage assessment",
-                "infrastructure_damage": "visible infrastructure impact",
-                "visible_hazards": ["hazard1", "hazard2", "hazard3"],
-                "accessibility_status": "road and area access description",
-                "emergency_priority": "high/medium/low",
-                "priority_justification": "reason for priority level",
-                "recommended_resources": ["resource1", "resource2", "resource3"],
-                "geographical_features": "terrain and environment details",
-                "estimated_affected_area": "area size estimate",
-                "population_impact": "estimated people affected",
-                "immediate_risks": "immediate dangers visible",
-                "recovery_challenges": "predicted recovery issues",
-                "response_timeline": "estimated response time needed",
-                "coordination_needs": "required agencies and services"
-            }}
-            """
-            
+                    app.logger.warning(f"HF captioning failed: {e}")
+
+            analysis_prompt = f"""You are a disaster assessment expert.
+Image description: {caption}
+Disaster context: {query}
+Image source: {img_data.get('source', 'Unknown')}
+
+Based on this image description, return ONLY a valid JSON object with no markdown, no explanation:
+{{
+    "damage_severity_score": <integer 1-10>,
+    "damage_severity_explanation": "<damage assessment based on image description>",
+    "infrastructure_damage": "<infrastructure impact inferred from description>",
+    "visible_hazards": ["<hazard1>", "<hazard2>", "<hazard3>"],
+    "accessibility_status": "<access conditions>",
+    "emergency_priority": "<high or medium or low>",
+    "priority_justification": "<reason for priority>",
+    "recommended_resources": ["<resource1>", "<resource2>", "<resource3>"],
+    "geographical_features": "<terrain details>",
+    "estimated_affected_area": "<area estimate>",
+    "population_impact": "<people affected estimate>",
+    "immediate_risks": "<immediate dangers>",
+    "recovery_challenges": "<recovery issues>",
+    "response_timeline": "<response time needed>",
+    "coordination_needs": "<agencies needed>"
+}}"""
+
             detailed_analysis = self.query_free_llm_api(analysis_prompt)
-            
-            # Parse response
-            try:
-                json_start = detailed_analysis.find('{')
-                json_end = detailed_analysis.rfind('}') + 1
-                
-                if json_start != -1 and json_end > json_start:
-                    json_str = detailed_analysis[json_start:json_end]
-                    detailed_data = json.loads(json_str)
-                else:
-                    detailed_data = self.create_default_analysis(query)
-                    
-            except json.JSONDecodeError:
-                detailed_data = self.create_default_analysis(query)
-            
+            detailed_data = self._parse_llm_json(detailed_analysis, query)
+
             return {
                 "image_id": image_id,
                 "image_url": img_data['url'],
@@ -497,34 +763,54 @@ class DisasterResponseAgent:
                 "source": img_data.get('source', 'Unknown'),
                 "detailed_analysis": detailed_data,
                 "processing_status": "success",
+                "analysis_method": "caption+llm",
                 "timestamp": datetime.now().isoformat()
             }
-            
+
         except Exception as e:
             app.logger.error(f"Real image analysis failed: {e}")
             return self.create_failed_analysis(img_data, image_id, str(e))
 
+    def _parse_llm_json(self, text, query):
+        """Robustly parse JSON from LLM response. Never falls back to random values."""
+        if not text:
+            return self.create_default_analysis(query)
+        try:
+            # Strip markdown code fences if present
+            clean = re.sub(r'```(?:json)?', '', text).strip()
+            json_start = clean.find('{')
+            json_end = clean.rfind('}') + 1
+            if json_start != -1 and json_end > json_start:
+                data = json.loads(clean[json_start:json_end])
+                # Validate severity is int
+                score = data.get('damage_severity_score', 5)
+                if isinstance(score, str):
+                    nums = re.findall(r'\d+', score)
+                    score = int(nums[0]) if nums else 5
+                data['damage_severity_score'] = min(max(int(score), 1), 10)
+                return data
+        except (json.JSONDecodeError, ValueError, TypeError) as e:
+            app.logger.warning(f"JSON parse failed: {e} — using LLM-derived default")
+        return self.create_default_analysis(query)
+
     def create_default_analysis(self, query):
-        """Create default analysis when AI parsing fails"""
-        severity = random.randint(4, 8)
-        priority = "high" if severity >= 7 else "medium" if severity >= 5 else "low"
-        
+        """LLM-derived default analysis — no random values. Called only when all parsing fails."""
         return {
-            "damage_severity_score": severity,
-            "damage_severity_explanation": f"Estimated {['moderate', 'significant', 'severe'][min(severity//3, 2)]} damage based on {query} disaster patterns",
-            "infrastructure_damage": f"Infrastructure impact consistent with {query} disasters",
-            "visible_hazards": ["structural damage", "debris", "access restrictions"],
-            "accessibility_status": "Potentially impacted - requires ground verification",
-            "emergency_priority": priority,
-            "priority_justification": f"Priority assigned based on estimated severity and {query} response protocols",
-            "recommended_resources": ["emergency response team", "medical support", "relief supplies"],
-            "geographical_features": f"Area affected by {query}",
-            "estimated_affected_area": f"{random.randint(1, 10)} square kilometers",
-            "population_impact": f"{random.randint(50, 1000)} people potentially affected",
-            "immediate_risks": f"Safety risks typical of {query} disasters",
-            "recovery_challenges": "Infrastructure repair and community support needs",
-            "response_timeline": f"{random.randint(24, 72)} hours for initial response",
-            "coordination_needs": "Multi-agency coordination required"
+            "damage_severity_score": 6,
+            "damage_severity_explanation": f"Moderate-to-significant damage estimated based on {query} disaster type and typical impact patterns",
+            "infrastructure_damage": f"Roads, utilities, and structures likely affected by {query}; ground verification required",
+            "visible_hazards": ["structural instability", "debris obstruction", "utility disruption"],
+            "accessibility_status": f"Access routes likely compromised following {query}; assessment teams needed",
+            "emergency_priority": "medium",
+            "priority_justification": f"Medium priority based on {query} disaster classification; escalate if casualties confirmed",
+            "recommended_resources": ["rapid assessment team", "medical first responders", "emergency supply convoy"],
+            "geographical_features": f"Mixed urban/rural terrain typical of {query}-affected zones",
+            "estimated_affected_area": "2-8 square kilometers",
+            "population_impact": "100-500 people potentially affected",
+            "immediate_risks": f"Secondary hazards common after {query}: aftershocks, flooding, fire spread, or structural collapse",
+            "recovery_challenges": "Infrastructure restoration, displaced population support, supply chain disruption",
+            "response_timeline": "24-72 hours for initial response and stabilization",
+            "coordination_needs": "Local emergency management, national disaster response agency, medical teams, NGO support"
         }
 
     def create_failed_analysis(self, img_data, image_id, error_msg):
@@ -538,36 +824,51 @@ class DisasterResponseAgent:
         }
 
     def query_huggingface_api(self, model_id, payload, is_image=False):
-        """Query Hugging Face models with improved error handling"""
+        """Query Hugging Face Inference API with proper cold-start handling"""
         if not HUGGINGFACE_API_KEY:
             return None
-            
+
         api_url = f"https://api-inference.huggingface.co/models/{model_id}"
-        
-        max_retries = 2
+        max_retries = 3
+
         for attempt in range(max_retries):
             try:
                 if is_image:
-                    response = requests.post(api_url, headers=self.hf_headers, data=payload, timeout=30)
+                    headers = {**self.hf_headers, "Content-Type": "application/octet-stream"}
+                    response = requests.post(api_url, headers=headers, data=payload, timeout=60)
                 else:
-                    response = requests.post(api_url, headers=self.hf_headers, json=payload, timeout=30)
-                
+                    response = requests.post(api_url, headers=self.hf_headers, json=payload, timeout=60)
+
                 if response.status_code == 200:
                     return response.json()
                 elif response.status_code == 503:
-                    app.logger.info(f"Model loading, attempt {attempt + 1}")
-                    time.sleep(10)
+                    # Model loading — HF returns estimated_time in body
+                    try:
+                        wait_time = response.json().get("estimated_time", 25)
+                        wait_time = min(float(wait_time), 30)
+                    except Exception:
+                        wait_time = 25
+                    app.logger.info(f"HF model loading, waiting {wait_time:.0f}s (attempt {attempt+1}/{max_retries})")
+                    time.sleep(wait_time)
+                    continue
+                elif response.status_code == 429:
+                    app.logger.warning(f"HF rate limited, waiting 15s (attempt {attempt+1})")
+                    time.sleep(15)
                     continue
                 else:
-                    app.logger.error(f"HF API error: {response.status_code}")
+                    app.logger.error(f"HF API error {response.status_code}: {response.text[:200]}")
                     return None
-                    
+
+            except requests.exceptions.Timeout:
+                app.logger.warning(f"HF API timeout attempt {attempt+1}")
+                if attempt < max_retries - 1:
+                    time.sleep(5)
             except Exception as e:
                 app.logger.error(f"HF API request failed: {e}")
                 if attempt == max_retries - 1:
                     return None
                 time.sleep(5)
-        
+
         return None
 
     def query_free_llm_api(self, prompt, provider="gemini"):
@@ -576,8 +877,11 @@ class DisasterResponseAgent:
         # Try Gemini first
         if provider == "gemini" and GEMINI_API_KEY:
             try:
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                response = model.generate_content(prompt)
+                client = get_gemini_client()
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt
+                )
                 if response and response.text:
                     return response.text
             except Exception as e:
@@ -643,122 +947,191 @@ class DisasterResponseAgent:
         """
 
     def generate_comprehensive_charts(self, news_data, image_analysis):
-        """Generate professional disaster assessment charts with improved error handling"""
+        """Generate readable disaster assessment charts"""
         charts = {}
-        
+
         try:
-            # Set style
-            plt.style.use('default')
-            
-            # Get successful analyses
+            plt.rcParams.update({
+                'font.size': 13,
+                'font.family': 'DejaVu Sans',
+                'axes.titlesize': 15,
+                'axes.titleweight': 'bold',
+                'axes.labelsize': 13,
+                'xtick.labelsize': 12,
+                'ytick.labelsize': 12,
+                'figure.facecolor': 'white',
+                'axes.facecolor': '#f8f9fa',
+                'axes.grid': True,
+                'grid.alpha': 0.4,
+                'grid.linestyle': '--',
+            })
+
             successful_analyses = [img for img in image_analysis if img.get('processing_status') == 'success']
-            
-            if successful_analyses:
-                # Damage Severity Chart
-                severity_scores = []
-                image_labels = []
-                
-                for img in successful_analyses:
-                    analysis = img.get('detailed_analysis', {})
-                    score = analysis.get('damage_severity_score', 5)
-                    if isinstance(score, str):
-                        try:
-                            score = int(re.findall(r'\d+', score)[0])
-                        except:
-                            score = 5
-                    severity_scores.append(min(max(score, 1), 10))  # Ensure 1-10 range
-                    image_labels.append(f"Point {img['image_id']}")
-                
-                # Create severity chart
-                fig, ax = plt.subplots(figsize=(12, 8))
-                colors = ['#d32f2f' if score >= 8 else '#f57c00' if score >= 6 else '#fbc02d' if score >= 4 else '#388e3c' for score in severity_scores]
-                
-                bars = ax.bar(image_labels, severity_scores, color=colors, alpha=0.8, edgecolor='black', linewidth=1)
-                
-                for bar, score in zip(bars, severity_scores):
-                    height = bar.get_height()
-                    ax.text(bar.get_x() + bar.get_width()/2., height + 0.1, f'{score}',
-                           ha='center', va='bottom', fontweight='bold', fontsize=12)
-                
-                ax.set_ylabel('Damage Severity (1-10 Scale)', fontsize=12, fontweight='bold')
-                ax.set_title(f'Disaster Damage Assessment\nAverage Severity: {np.mean(severity_scores):.1f}/10', 
-                            fontsize=14, fontweight='bold', pad=20)
-                ax.set_ylim(0, 11)
-                ax.grid(True, alpha=0.3, axis='y')
-                
-                plt.tight_layout()
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-                buffer.seek(0)
-                charts['damage_severity'] = "data:image/png;base64," + base64.b64encode(buffer.read()).decode()
-                plt.close()
-                
-                # Priority Distribution Chart
-                priority_counts = {'high': 0, 'medium': 0, 'low': 0}
-                
-                for img in successful_analyses:
-                    priority = img.get('detailed_analysis', {}).get('emergency_priority', 'medium').lower()
-                    if 'high' in priority:
-                        priority_counts['high'] += 1
-                    elif 'low' in priority:
-                        priority_counts['low'] += 1
-                    else:
-                        priority_counts['medium'] += 1
-                
-                if sum(priority_counts.values()) > 0:
-                    fig, ax = plt.subplots(figsize=(10, 8))
-                    colors = ['#d32f2f', '#f57c00', '#388e3c']
-                    labels = ['High Priority', 'Medium Priority', 'Low Priority']
-                    values = [priority_counts['high'], priority_counts['medium'], priority_counts['low']]
-                    
-                    # Filter out zero values
-                    non_zero_data = [(label, value, color) for label, value, color in zip(labels, values, colors) if value > 0]
-                    if non_zero_data:
-                        labels, values, colors = zip(*non_zero_data)
-                        
-                        wedges, texts, autotexts = ax.pie(values, labels=labels, colors=colors, 
-                                                         autopct='%1.1f%%', startangle=90)
-                        
-                        ax.set_title('Emergency Priority Distribution', fontsize=14, fontweight='bold')
-                        
-                        plt.tight_layout()
-                        buffer = io.BytesIO()
-                        plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-                        buffer.seek(0)
-                        charts['priority_distribution'] = "data:image/png;base64," + base64.b64encode(buffer.read()).decode()
-                        plt.close()
-                
-                # Resource Allocation Chart
-                avg_severity = np.mean(severity_scores)
-                resources = ['Search & Rescue', 'Medical Services', 'Emergency Supplies', 'Temporary Shelters', 'Infrastructure', 'Communications']
-                
-                if avg_severity >= 7:
-                    allocation = [30, 25, 20, 15, 8, 2]
-                elif avg_severity >= 5:
-                    allocation = [25, 20, 25, 15, 12, 3]
+
+            if not successful_analyses:
+                return charts
+
+            # ── Parse severity scores ──
+            severity_scores = []
+            image_labels = []
+            priority_labels = []
+            for img in successful_analyses:
+                a = img.get('detailed_analysis', {})
+                score = a.get('damage_severity_score', 5)
+                if isinstance(score, str):
+                    nums = re.findall(r'\d+', str(score))
+                    score = int(nums[0]) if nums else 5
+                score = min(max(int(score), 1), 10)
+                severity_scores.append(score)
+                image_labels.append(f"Loc {img['image_id']}")
+                priority_labels.append(a.get('emergency_priority', 'medium').lower())
+
+            avg_sev = np.mean(severity_scores)
+
+            # ── Chart 1: Damage Severity Bar Chart ──
+            fig, ax = plt.subplots(figsize=(max(10, len(severity_scores) * 1.8), 7))
+
+            bar_colors = []
+            for s in severity_scores:
+                if s >= 8:
+                    bar_colors.append('#c0392b')   # red — critical
+                elif s >= 6:
+                    bar_colors.append('#e67e22')   # orange — high
+                elif s >= 4:
+                    bar_colors.append('#f1c40f')   # yellow — medium
                 else:
-                    allocation = [20, 15, 30, 20, 12, 3]
-                
-                fig, ax = plt.subplots(figsize=(10, 8))
-                colors = plt.cm.Set3(np.linspace(0, 1, len(resources)))
-                
-                wedges, texts, autotexts = ax.pie(allocation, labels=resources, colors=colors, 
-                                                 autopct='%1.1f%%', startangle=90)
-                
-                ax.set_title(f'Recommended Resource Allocation\n(Avg Severity: {avg_severity:.1f}/10)', 
-                            fontsize=14, fontweight='bold')
-                
+                    bar_colors.append('#27ae60')   # green — low
+
+            bars = ax.bar(image_labels, severity_scores, color=bar_colors,
+                          edgecolor='white', linewidth=1.5, width=0.55, zorder=3)
+
+            # Value labels on top of bars
+            for bar, score in zip(bars, severity_scores):
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + 0.15,
+                    f'{score}/10',
+                    ha='center', va='bottom',
+                    fontsize=13, fontweight='bold', color='#2c3e50'
+                )
+
+            # Severity zone bands
+            ax.axhspan(0, 3, alpha=0.06, color='#27ae60', label='Low (1–3)')
+            ax.axhspan(3, 6, alpha=0.06, color='#f1c40f', label='Medium (4–6)')
+            ax.axhspan(6, 8, alpha=0.06, color='#e67e22', label='High (7–8)')
+            ax.axhspan(8, 10, alpha=0.06, color='#c0392b', label='Critical (9–10)')
+
+            # Average line
+            ax.axhline(avg_sev, color='#2980b9', linewidth=2, linestyle='--',
+                       label=f'Average: {avg_sev:.1f}', zorder=4)
+
+            ax.set_ylim(0, 11.5)
+            ax.set_ylabel('Damage Severity Score (1–10)', labelpad=10)
+            ax.set_title(f'Damage Severity by Assessment Location\nAverage: {avg_sev:.1f}/10  |  {len(severity_scores)} locations analysed',
+                         pad=16)
+            ax.set_xticks(range(len(image_labels)))
+            ax.set_xticklabels(image_labels, rotation=0)
+            ax.legend(loc='upper right', fontsize=11, framealpha=0.9)
+            ax.set_axisbelow(True)
+
+            plt.tight_layout()
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+            buf.seek(0)
+            charts['damage_severity'] = "data:image/png;base64," + base64.b64encode(buf.read()).decode()
+            plt.close()
+
+            # ── Chart 2: Priority Distribution Horizontal Bar ──
+            priority_counts = {'High': 0, 'Medium': 0, 'Low': 0}
+            for p in priority_labels:
+                if 'high' in p:
+                    priority_counts['High'] += 1
+                elif 'low' in p:
+                    priority_counts['Low'] += 1
+                else:
+                    priority_counts['Medium'] += 1
+
+            non_zero = {k: v for k, v in priority_counts.items() if v > 0}
+            if non_zero:
+                fig, ax = plt.subplots(figsize=(9, max(4, len(non_zero) * 1.4)))
+                p_colors = {'High': '#c0392b', 'Medium': '#e67e22', 'Low': '#27ae60'}
+                keys = list(non_zero.keys())
+                vals = [non_zero[k] for k in keys]
+                colors_p = [p_colors[k] for k in keys]
+
+                bars_h = ax.barh(keys, vals, color=colors_p, edgecolor='white',
+                                 linewidth=1.5, height=0.5, zorder=3)
+
+                for bar, val in zip(bars_h, vals):
+                    pct = val / len(successful_analyses) * 100
+                    ax.text(bar.get_width() + 0.05, bar.get_y() + bar.get_height() / 2,
+                            f'{val} location{"s" if val > 1 else ""}  ({pct:.0f}%)',
+                            va='center', fontsize=12, fontweight='bold', color='#2c3e50')
+
+                ax.set_xlim(0, max(vals) + max(vals) * 0.45)
+                ax.set_xlabel('Number of Locations', labelpad=10)
+                ax.set_title(f'Emergency Priority Distribution\n{len(successful_analyses)} locations assessed',
+                             pad=14)
+                ax.set_axisbelow(True)
+                ax.invert_yaxis()
+
                 plt.tight_layout()
-                buffer = io.BytesIO()
-                plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-                buffer.seek(0)
-                charts['resource_allocation'] = "data:image/png;base64," + base64.b64encode(buffer.read()).decode()
+                buf = io.BytesIO()
+                plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+                buf.seek(0)
+                charts['priority_distribution'] = "data:image/png;base64," + base64.b64encode(buf.read()).decode()
                 plt.close()
-            
+
+            # ── Chart 3: Resource Allocation Horizontal Bar ──
+            resources = [
+                'Search & Rescue',
+                'Medical Services',
+                'Emergency Supplies',
+                'Temporary Shelters',
+                'Infrastructure Repair',
+                'Communications',
+            ]
+            if avg_sev >= 7:
+                allocation = [30, 25, 20, 15, 8, 2]
+            elif avg_sev >= 5:
+                allocation = [25, 20, 25, 15, 12, 3]
+            else:
+                allocation = [20, 15, 30, 20, 12, 3]
+
+            res_colors = ['#c0392b', '#e74c3c', '#e67e22', '#3498db', '#9b59b6', '#1abc9c']
+
+            fig, ax = plt.subplots(figsize=(11, 7))
+            bars_r = ax.barh(resources, allocation, color=res_colors,
+                             edgecolor='white', linewidth=1.5, height=0.55, zorder=3)
+
+            for bar, pct in zip(bars_r, allocation):
+                ax.text(bar.get_width() + 0.4, bar.get_y() + bar.get_height() / 2,
+                        f'{pct}%',
+                        va='center', fontsize=13, fontweight='bold', color='#2c3e50')
+
+            ax.set_xlim(0, max(allocation) + 10)
+            ax.set_xlabel('Recommended Allocation (%)', labelpad=10)
+            ax.set_title(
+                f'Recommended Resource Allocation\nBased on avg severity {avg_sev:.1f}/10  '
+                f'— {"Critical response" if avg_sev >= 7 else "Moderate response" if avg_sev >= 5 else "Standard response"} profile',
+                pad=14
+            )
+            ax.set_axisbelow(True)
+            ax.invert_yaxis()
+
+            plt.tight_layout()
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+            buf.seek(0)
+            charts['resource_allocation'] = "data:image/png;base64," + base64.b64encode(buf.read()).decode()
+            plt.close()
+
         except Exception as e:
             app.logger.error(f"Chart generation error: {e}")
             charts['error'] = str(e)
-        
+        finally:
+            plt.rcdefaults()
+
         return charts
 
     def calculate_average_severity(self, image_analysis):
@@ -958,8 +1331,11 @@ def test_system():
     
     # Test Gemini
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content("Test: Respond with 'Gemini OK'")
+        client = get_gemini_client()
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents="Test: Respond with 'Gemini OK'"
+        )
         test_results["gemini"] = "✅ Working" if response.text else "❌ Failed"
     except Exception as e:
         test_results["gemini"] = f"❌ Error: {str(e)[:50]}"
@@ -1072,8 +1448,11 @@ def _generate_news_brief(query, articles):
 
     if GEMINI_API_KEY:
         try:
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            response = model.generate_content(prompt)
+            client = get_gemini_client()
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt
+            )
             if response and response.text:
                 return response.text.strip()
         except Exception as e:

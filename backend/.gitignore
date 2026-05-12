@@ -5,3 +5,4 @@ big_masks/
 ml_models/*.pth
 ml_models/*.h5
 ml_models/*.onnx
+.venv
