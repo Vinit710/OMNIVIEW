@@ -287,6 +287,74 @@
   padding: 20px;
 }
 
+/* ── Sentinel Batch Section ── */
+.sentinel-section {
+  padding: 20px;
+}
+
+.sentinel-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 1000px;
+}
+
+.sentinel-inputs .input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.sentinel-inputs input[type="text"],
+.sentinel-inputs input[type="date"],
+.sentinel-inputs input[type="number"] {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  min-width: 160px;
+}
+
+.sentinel-inputs input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.input-separator {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 0 4px;
+}
+
+.sentinel-meta {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.sentinel-model-block {
+  margin-top: 18px;
+}
+
+.sentinel-class-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.sentinel-class-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .section-heading {
   color: var(--text-primary);
   font-size: 18px;

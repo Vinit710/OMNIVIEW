@@ -35,6 +35,7 @@ from change_detection import detect_building_changes
 from landcover import landcover_bp
 # Import the glacial lake change detection blueprint
 from glacial_lake import glacial_lake_bp
+from sentinel_service import sentinel_bp
 
 # Load environment variables
 load_dotenv()
@@ -70,6 +71,7 @@ app.register_blueprint(road_bp)
 app.register_blueprint(road_extract_bp)
 app.register_blueprint(landcover_bp)
 app.register_blueprint(glacial_lake_bp)
+app.register_blueprint(sentinel_bp)
 
 class DisasterResponseAgent:
     def __init__(self):

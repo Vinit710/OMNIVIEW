@@ -14,6 +14,8 @@ const API_CONFIG = {
     ANALYZE_DISASTERS: "/api/analyze-disasters",
     LANDCOVER: "/api/landcover",
     GLACIAL_LAKE_CHANGE: "/api/glacial-lake-change",
+    SENTINEL_FETCH: "/api/sentinel/fetch",
+    SENTINEL_RUN: "/api/sentinel/run-models",
   },
 
   // Helper method to get full URL
