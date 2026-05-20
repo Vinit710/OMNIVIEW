@@ -63,6 +63,10 @@
             <div class="item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19L20 5"/><path d="M4 5l4 0"/><path d="M16 19h4"/></svg></div>
             <span>Road Extraction</span>
           </div>
+          <div class="analytics-item" data-section="sentinel">
+            <div class="item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v6"/><path d="M12 15v6"/><path d="M3 12h6"/><path d="M15 12h6"/></svg></div>
+            <span>Sentinel Batch</span>
+          </div>
           <div class="analytics-item" data-section="landcover">
             <div class="item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></div>
             <span>Land Cover</span>
@@ -168,6 +172,130 @@
                 <p class="results-hint">
                   You can right-click and save any result image. Use the Toggle Overlay button to adjust overlay visibility.
                 </p>
+              </div>
+            </div>
+
+            <div id="sentinelSection" class="sentinel-section" style="display:none;">
+              <h2 class="section-heading">Sentinel Hub Batch Analysis</h2>
+              <p class="section-description">
+                Provide coordinates or a place name to download Sentinel-2 imagery, then run all models in one step.
+              </p>
+
+              <div class="sentinel-inputs">
+                <div class="input-row">
+                  <label class="form-label" for="sentinelPlace">Place name</label>
+                  <input id="sentinelPlace" type="text" placeholder="e.g. Balanagar, Hyderabad" />
+                  <span class="input-separator">or</span>
+                  <label class="form-label" for="sentinelLat">Latitude</label>
+                  <input id="sentinelLat" type="text" placeholder="17.5000" />
+                  <label class="form-label" for="sentinelLon">Longitude</label>
+                  <input id="sentinelLon" type="text" placeholder="78.5000" />
+                </div>
+                <div class="input-row">
+                  <label class="form-label" for="sentinelHistorical">Historical date</label>
+                  <input id="sentinelHistorical" type="date" />
+                  <label class="form-label" for="sentinelRecent">Recent date</label>
+                  <input id="sentinelRecent" type="date" />
+                  <label class="form-label" for="sentinelBbox">BBox (km)</label>
+                  <input id="sentinelBbox" type="number" min="0.5" step="0.5" placeholder="2" />
+                </div>
+                <div class="form-actions">
+                  <button id="sentinelFetchBtn" class="action-btn" type="button">Fetch Sentinel Images</button>
+                  <button id="sentinelRunBtn" class="action-btn small" type="button" disabled>Run All Models</button>
+                  <div id="sentinelStatus" class="status-text">Ready</div>
+                </div>
+                <div id="sentinelLocation" class="sentinel-meta"></div>
+              </div>
+
+              <div id="sentinelPreview" style="display:none;">
+                <h3 class="results-heading">Sentinel Images</h3>
+                <div class="results-columns">
+                  <div class="result-card">
+                    <h4 class="result-card-title">Historical</h4>
+                    <div id="sentinelHistoricalPreview" class="image-container">
+                      <span class="placeholder-text">No image</span>
+                    </div>
+                  </div>
+                  <div class="result-card">
+                    <h4 class="result-card-title">Recent</h4>
+                    <div id="sentinelRecentPreview" class="image-container">
+                      <span class="placeholder-text">No image</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="sentinelModelResults" style="display:none;">
+                <div class="sentinel-model-block">
+                  <h3 class="results-heading">Built-up Change Detection</h3>
+                  <div class="results-columns">
+                    <div class="result-card">
+                      <h4 class="result-card-title">Mask</h4>
+                      <div id="sentinelChangeMask" class="image-container">
+                        <span class="placeholder-text">No image</span>
+                      </div>
+                    </div>
+                    <div class="result-card">
+                      <h4 class="result-card-title">Overlay</h4>
+                      <div id="sentinelChangeOverlay" class="image-container">
+                        <span class="placeholder-text">No image</span>
+                      </div>
+                    </div>
+                    <div class="result-card">
+                      <h4 class="result-card-title">Comparison</h4>
+                      <div id="sentinelChangeComparison" class="image-container">
+                        <span class="placeholder-text">No image</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div id="sentinelChangeStats" class="status-text"></div>
+                </div>
+
+                <div class="sentinel-model-block">
+                  <h3 class="results-heading">Land Cover Segmentation</h3>
+                  <div class="results-columns">
+                    <div class="result-card">
+                      <h4 class="result-card-title">Original</h4>
+                      <div id="sentinelLandcoverOriginal" class="image-container">
+                        <span class="placeholder-text">No image</span>
+                      </div>
+                    </div>
+                    <div class="result-card">
+                      <h4 class="result-card-title">Mask</h4>
+                      <div id="sentinelLandcoverMask" class="image-container">
+                        <span class="placeholder-text">No image</span>
+                      </div>
+                    </div>
+                    <div class="result-card">
+                      <h4 class="result-card-title">Class Distribution</h4>
+                      <div id="sentinelLandcoverList" class="sentinel-class-list"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="sentinel-model-block">
+                  <h3 class="results-heading">Road Extraction</h3>
+                  <div class="results-columns">
+                    <div class="result-card">
+                      <h4 class="result-card-title">Original</h4>
+                      <div id="sentinelRoadOriginal" class="image-container">
+                        <span class="placeholder-text">No image</span>
+                      </div>
+                    </div>
+                    <div class="result-card">
+                      <h4 class="result-card-title">Mask</h4>
+                      <div id="sentinelRoadMask" class="image-container">
+                        <span class="placeholder-text">No image</span>
+                      </div>
+                    </div>
+                    <div class="result-card">
+                      <h4 class="result-card-title">Overlay</h4>
+                      <div id="sentinelRoadOverlay" class="image-container">
+                        <span class="placeholder-text">No image</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

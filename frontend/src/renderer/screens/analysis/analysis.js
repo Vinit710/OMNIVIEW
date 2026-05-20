@@ -149,6 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const analyticsGrid = document.querySelector(".analytics-grid");
   const bigroadsSection = document.getElementById("bigroadsSection");
   const landcoverSection = document.getElementById("landcoverSection");
+  const sentinelSection = document.getElementById("sentinelSection");
   const analyticsContainer = document.getElementById("analyticsContainer");
   
   // Analytics section switching logic
@@ -163,6 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (analyticsGrid) analyticsGrid.style.display = "none";
       if (bigroadsSection) bigroadsSection.style.display = "none";
       if (landcoverSection) landcoverSection.style.display = "none";
+      if (sentinelSection) sentinelSection.style.display = "none";
       
       // Show selected section
       if (section === "bigroads") {
@@ -176,6 +178,10 @@ document.addEventListener('DOMContentLoaded', () => {
         addLog("Switched to Land Cover Segmentation", "info");
         // Notify the inline landcover script to init/resize map
         window.dispatchEvent(new Event('landcover-show'));
+      } else if (section === "sentinel") {
+        if (analyticsContainer) analyticsContainer.style.display = "";
+        if (sentinelSection) sentinelSection.style.display = "block";
+        addLog("Switched to Sentinel batch analysis", "info");
       } else {
         if (analyticsContainer) analyticsContainer.style.display = "";
         if (analyticsGrid) analyticsGrid.style.display = "flex";
@@ -247,6 +253,199 @@ document.addEventListener('DOMContentLoaded', () => {
           : "Show Overlay";
       });
     }
+  }
+
+  // --- Sentinel Batch Analysis ---
+  const sentinelFetchBtn = document.getElementById("sentinelFetchBtn");
+  const sentinelRunBtn = document.getElementById("sentinelRunBtn");
+  const sentinelStatus = document.getElementById("sentinelStatus");
+  const sentinelLocation = document.getElementById("sentinelLocation");
+  const sentinelPreview = document.getElementById("sentinelPreview");
+  const sentinelModelResults = document.getElementById("sentinelModelResults");
+  const sentinelHistoricalPreview = document.getElementById("sentinelHistoricalPreview");
+  const sentinelRecentPreview = document.getElementById("sentinelRecentPreview");
+  const sentinelChangeMask = document.getElementById("sentinelChangeMask");
+  const sentinelChangeOverlay = document.getElementById("sentinelChangeOverlay");
+  const sentinelChangeComparison = document.getElementById("sentinelChangeComparison");
+  const sentinelChangeStats = document.getElementById("sentinelChangeStats");
+  const sentinelLandcoverOriginal = document.getElementById("sentinelLandcoverOriginal");
+  const sentinelLandcoverMask = document.getElementById("sentinelLandcoverMask");
+  const sentinelLandcoverList = document.getElementById("sentinelLandcoverList");
+  const sentinelRoadOriginal = document.getElementById("sentinelRoadOriginal");
+  const sentinelRoadMask = document.getElementById("sentinelRoadMask");
+  const sentinelRoadOverlay = document.getElementById("sentinelRoadOverlay");
+
+  let sentinelJobId = null;
+
+  function setImage(container, src) {
+    if (!container) return;
+    if (!src) {
+      container.innerHTML = '<span class="placeholder-text">No image</span>';
+      return;
+    }
+    container.innerHTML = `<img src="${src}" class="result-img"/>`;
+  }
+
+  function updateSentinelStatus(message, type = "info") {
+    if (sentinelStatus) sentinelStatus.textContent = message;
+    addLog(message, type);
+  }
+
+  if (sentinelFetchBtn) {
+    sentinelFetchBtn.addEventListener("click", async () => {
+      const placeName = document.getElementById("sentinelPlace").value.trim();
+      const latValue = document.getElementById("sentinelLat").value.trim();
+      const lonValue = document.getElementById("sentinelLon").value.trim();
+      const historicalDate = document.getElementById("sentinelHistorical").value;
+      const recentDate = document.getElementById("sentinelRecent").value;
+      const bboxValue = document.getElementById("sentinelBbox").value.trim();
+
+      const payload = {};
+      if (placeName) {
+        payload.place_name = placeName;
+      }
+
+      if (latValue && lonValue) {
+        const lat = Number.parseFloat(latValue);
+        const lon = Number.parseFloat(lonValue);
+        if (Number.isNaN(lat) || Number.isNaN(lon)) {
+          updateSentinelStatus("Invalid latitude or longitude", "warning");
+          return;
+        }
+        payload.lat = lat;
+        payload.lon = lon;
+      }
+
+      if (!payload.place_name && (payload.lat === undefined || payload.lon === undefined)) {
+        updateSentinelStatus("Provide a place name or coordinates", "warning");
+        return;
+      }
+
+      if (historicalDate) payload.historical_date = historicalDate;
+      if (recentDate) payload.recent_date = recentDate;
+      if (bboxValue) payload.bbox_km = bboxValue;
+
+      sentinelJobId = null;
+      if (sentinelLocation) sentinelLocation.textContent = "";
+      setImage(sentinelHistoricalPreview, null);
+      setImage(sentinelRecentPreview, null);
+      if (sentinelPreview) sentinelPreview.style.display = "none";
+      setImage(sentinelChangeMask, null);
+      setImage(sentinelChangeOverlay, null);
+      setImage(sentinelChangeComparison, null);
+      if (sentinelChangeStats) sentinelChangeStats.textContent = "";
+      setImage(sentinelLandcoverOriginal, null);
+      setImage(sentinelLandcoverMask, null);
+      if (sentinelLandcoverList) sentinelLandcoverList.innerHTML = "";
+      setImage(sentinelRoadOriginal, null);
+      setImage(sentinelRoadMask, null);
+      setImage(sentinelRoadOverlay, null);
+      if (sentinelRunBtn) sentinelRunBtn.disabled = true;
+      if (sentinelModelResults) sentinelModelResults.style.display = "none";
+      updateSentinelStatus("Fetching Sentinel images...", "info");
+
+      try {
+        const url = API_CONFIG ? API_CONFIG.getUrl("SENTINEL_FETCH") : "http://localhost:5000/api/sentinel/fetch";
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch Sentinel images");
+        }
+
+        sentinelJobId = data.job_id;
+        setImage(sentinelHistoricalPreview, data.images?.historical);
+        setImage(sentinelRecentPreview, data.images?.recent);
+        if (sentinelPreview) sentinelPreview.style.display = "";
+
+        if (sentinelLocation) {
+          const name = data.location?.place_name ? ` (${data.location.place_name})` : "";
+          sentinelLocation.textContent = `Location: ${data.location?.lat}, ${data.location?.lon}${name}`;
+        }
+
+        if (sentinelRunBtn) sentinelRunBtn.disabled = false;
+        updateSentinelStatus("Images ready. Run all models when ready.", "success");
+      } catch (err) {
+        updateSentinelStatus(`Error: ${err.message}`, "error");
+      }
+    });
+  }
+
+  if (sentinelRunBtn) {
+    sentinelRunBtn.addEventListener("click", async () => {
+      if (!sentinelJobId) {
+        updateSentinelStatus("Fetch images first", "warning");
+        return;
+      }
+
+      updateSentinelStatus("Running models on Sentinel images...", "info");
+
+      try {
+        const url = API_CONFIG ? API_CONFIG.getUrl("SENTINEL_RUN") : "http://localhost:5000/api/sentinel/run-models";
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ job_id: sentinelJobId }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Model run failed");
+        }
+
+        const change = data.results?.change_detection || {};
+        setImage(sentinelChangeMask, change.mask_image);
+        setImage(sentinelChangeOverlay, change.overlay_image);
+        setImage(sentinelChangeComparison, change.comparison_image);
+        if (sentinelChangeStats) {
+          if (change.change_percentage !== undefined) {
+            sentinelChangeStats.textContent = `Change detected: ${change.change_percentage}%`;
+          } else {
+            sentinelChangeStats.textContent = change.error ? `Error: ${change.error}` : "";
+          }
+        }
+
+        const landcover = data.results?.landcover || {};
+        setImage(sentinelLandcoverOriginal, landcover.original);
+        setImage(sentinelLandcoverMask, landcover.mask);
+        if (sentinelLandcoverList) {
+          if (Array.isArray(landcover.classes)) {
+            sentinelLandcoverList.innerHTML = landcover.classes.map((entry) => (
+              `<div class="sentinel-class-row"><span style="color:${entry.color}">${entry.name}</span><span>${entry.percentage}%</span></div>`
+            )).join("");
+          } else if (landcover.error) {
+            sentinelLandcoverList.innerHTML = `<div class="status-text">Error: ${landcover.error}</div>`;
+          } else {
+            sentinelLandcoverList.innerHTML = "";
+          }
+        }
+
+        const roads = data.results?.road_extraction || {};
+        if (roads.error) {
+          setImage(sentinelRoadOriginal, null);
+          setImage(sentinelRoadMask, null);
+          setImage(sentinelRoadOverlay, null);
+          if (sentinelRoadOverlay) {
+            sentinelRoadOverlay.innerHTML = `<span class="placeholder-text">Error: ${roads.error}</span>`;
+          }
+        } else {
+          setImage(sentinelRoadOriginal, roads.original);
+          setImage(sentinelRoadMask, roads.mask);
+          setImage(sentinelRoadOverlay, roads.overlay);
+        }
+
+        if (sentinelModelResults) sentinelModelResults.style.display = "";
+        if (Array.isArray(data.errors) && data.errors.length) {
+          updateSentinelStatus(`Completed with warnings: ${data.errors.join("; ")}`, "warning");
+        } else {
+          updateSentinelStatus("Model outputs ready", "success");
+        }
+      } catch (err) {
+        updateSentinelStatus(`Error: ${err.message}`, "error");
+      }
+    });
   }
 
   // Toggle dropdown
