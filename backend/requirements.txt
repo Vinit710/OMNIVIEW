@@ -2,7 +2,7 @@ flask
 flask-cors
 requests
 python-dotenv
-google-generativeai
+google-genai
 pillow
 numpy
 pandas

@@ -49,6 +49,9 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+AICREDITS_API_KEY = os.getenv("AICREDITS_API_KEY")
+AICREDITS_BASE_URL = os.getenv("AICREDITS_BASE_URL", "https://api.aicredits.in/v1")
+AICREDITS_MODEL = os.getenv("AICREDITS_MODEL", "google/gemini-2.5-flash")
 
 # Validate required API keys
 if not GEMINI_API_KEY or not GOOGLE_API_KEY or not GOOGLE_CX:
@@ -62,6 +65,46 @@ def get_gemini_client():
     if _gemini_client is None:
         _gemini_client = genai_new.Client(api_key=GEMINI_API_KEY)
     return _gemini_client
+
+
+def query_aicredits(prompt, image_bytes=None, mime="image/jpeg", max_tokens=4000, temperature=0.7):
+    """Query Gemini via the AICredits.in OpenAI-compatible gateway.
+
+    Raises on HTTP error or empty content so callers' fallback chains engage.
+    Gemini 2.5 Flash spends reasoning tokens from max_tokens, so keep the
+    budget generous or content comes back empty with finish_reason=length.
+    """
+    if not AICREDITS_API_KEY:
+        raise RuntimeError("AICREDITS_API_KEY not configured")
+
+    if image_bytes is not None:
+        b64 = base64.b64encode(image_bytes).decode()
+        content = [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+        ]
+    else:
+        content = prompt
+
+    response = requests.post(
+        f"{AICREDITS_BASE_URL}/chat/completions",
+        headers={
+            "Authorization": f"Bearer {AICREDITS_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": AICREDITS_MODEL,
+            "messages": [{"role": "user", "content": content}],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        },
+        timeout=60,
+    )
+    response.raise_for_status()
+    text = response.json()["choices"][0]["message"].get("content")
+    if not text:
+        raise RuntimeError("AICredits returned empty content")
+    return text
 
 
 app = Flask(__name__)
@@ -633,7 +676,7 @@ Return exactly this structure with your assessed values:
     "coordination_needs": "<specific agencies needed for {query}>"
 }}"""
 
-            detailed_analysis = self.query_free_llm_api(analysis_prompt)
+            detailed_analysis = self.query_free_llm_api(analysis_prompt, provider="aicredits")
             detailed_data = self._parse_llm_json(detailed_analysis, query)
 
             return {
@@ -651,14 +694,14 @@ Return exactly this structure with your assessed values:
             return self.create_failed_analysis(img_data, image_id, str(e))
 
     def analyze_real_image(self, image_bytes, img_data, image_id, query):
-        """Analyze real downloaded images - uses Gemini vision first, HF caption as fallback"""
+        """Analyze real downloaded images - uses Gemini vision via AICredits first, HF caption as fallback"""
         try:
             caption = None
 
-            # --- Try Gemini vision directly (best quality) ---
-            if GEMINI_API_KEY:
+            # --- Try Gemini vision via AICredits gateway (best quality) ---
+            if AICREDITS_API_KEY:
                 try:
-                    app.logger.info(f"Attempting Gemini vision analysis for image {image_id}")
+                    app.logger.info(f"Attempting AICredits Gemini vision analysis for image {image_id}")
                     # Detect mime type
                     mime = "image/jpeg"
                     if image_bytes[:4] == b'\x89PNG':
@@ -689,29 +732,21 @@ Analyze this image and return ONLY a valid JSON object with no markdown, no expl
     "coordination_needs": "<agencies needed based on damage visible>"
 }}"""
 
-                    client = get_gemini_client()
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=[
-                            vision_prompt,
-                            genai_new.types.Part.from_bytes(data=image_bytes, mime_type=mime),
-                        ]
-                    )
-                    if response and response.text:
-                        detailed_data = self._parse_llm_json(response.text, query)
-                        app.logger.info(f"Gemini vision analysis success for image {image_id}")
-                        return {
-                            "image_id": image_id,
-                            "image_url": img_data['url'],
-                            "caption": f"Gemini vision analysis of {query} disaster scene",
-                            "source": img_data.get('source', 'Unknown'),
-                            "detailed_analysis": detailed_data,
-                            "processing_status": "success",
-                            "analysis_method": "gemini_vision",
-                            "timestamp": datetime.now().isoformat()
-                        }
+                    response_text = query_aicredits(vision_prompt, image_bytes=image_bytes, mime=mime)
+                    detailed_data = self._parse_llm_json(response_text, query)
+                    app.logger.info(f"AICredits Gemini vision analysis success for image {image_id}")
+                    return {
+                        "image_id": image_id,
+                        "image_url": img_data['url'],
+                        "caption": f"Gemini vision analysis of {query} disaster scene",
+                        "source": img_data.get('source', 'Unknown'),
+                        "detailed_analysis": detailed_data,
+                        "processing_status": "success",
+                        "analysis_method": "aicredits_gemini_vision",
+                        "timestamp": datetime.now().isoformat()
+                    }
                 except Exception as e:
-                    app.logger.warning(f"Gemini vision failed for image {image_id}: {e}")
+                    app.logger.warning(f"AICredits Gemini vision failed for image {image_id}: {e}")
 
             # --- Fallback: HF BLIP caption + LLM text analysis ---
             caption = f"Disaster scene from {query} event requiring assessment"
@@ -755,7 +790,7 @@ Based on this image description, return ONLY a valid JSON object with no markdow
     "coordination_needs": "<agencies needed>"
 }}"""
 
-            detailed_analysis = self.query_free_llm_api(analysis_prompt)
+            detailed_analysis = self.query_free_llm_api(analysis_prompt, provider="aicredits")
             detailed_data = self._parse_llm_json(detailed_analysis, query)
 
             return {
@@ -874,9 +909,20 @@ Based on this image description, return ONLY a valid JSON object with no markdow
         return None
 
     def query_free_llm_api(self, prompt, provider="gemini"):
-        """Query free LLM APIs with comprehensive fallback"""
-        
-        # Try Gemini first
+        """Query LLM APIs with comprehensive fallback.
+
+        provider="aicredits": Gemini via AICredits gateway, then DeepSeek -> Groq
+        provider="gemini" (default): direct Gemini, then DeepSeek -> Groq
+        """
+
+        # Try Gemini via AICredits gateway (report pipeline)
+        if provider == "aicredits" and AICREDITS_API_KEY:
+            try:
+                return query_aicredits(prompt)
+            except Exception as e:
+                app.logger.error(f"AICredits API failed: {e}")
+
+        # Try direct Gemini first
         if provider == "gemini" and GEMINI_API_KEY:
             try:
                 client = get_gemini_client()
@@ -1245,7 +1291,7 @@ Based on this image description, return ONLY a valid JSON object with no markdow
         **System:** AI Disaster Assessment v3.0
         """
 
-        report_content = self.query_free_llm_api(report_prompt)
+        report_content = self.query_free_llm_api(report_prompt, provider="aicredits")
         
         # Add technical appendix
         technical_appendix = f"""
@@ -1330,7 +1376,14 @@ def status():
 def test_system():
     """Quick system test endpoint"""
     test_results = {}
-    
+
+    # Test AICredits gateway (report pipeline provider)
+    try:
+        text = query_aicredits("Test: Respond with 'AICredits OK'", max_tokens=500)
+        test_results["aicredits"] = "✅ Working" if text else "❌ Failed"
+    except Exception as e:
+        test_results["aicredits"] = f"❌ Error: {str(e)[:50]}"
+
     # Test Gemini
     try:
         client = get_gemini_client()

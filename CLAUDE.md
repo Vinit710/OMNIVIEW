@@ -43,7 +43,7 @@ docker run -p 5000:5000 omniview-backend
 ```
 
 ### Tests
-No test suite exists. The only smoke test is `GET /api/test` which checks Gemini, Google Search, and image generation connectivity.
+No test suite exists. The only smoke test is `GET /api/test` which checks AICredits, Gemini, Google Search, and image generation connectivity.
 
 ## Architecture
 
@@ -70,7 +70,11 @@ No test suite exists. The only smoke test is `GET /api/test` which checks Gemini
 - **Standalone CLI** (not wired into Flask): `nlp_socilmedia.py` — Twitter/Reddit disaster data collector with spaCy NER + SQLite.
 
 ### LLM Fallback Chain
-The backend cascades through multiple providers: Gemini (primary) -> DeepSeek -> Groq (Llama-3.1-70B) -> static JSON default. LLM responses are parsed by extracting the outermost `{...}` JSON block, with safe defaults on parse failure.
+Two chains depending on the call site:
+- **Report Generator pipeline** (`/api/generate_report`: image vision analysis + report text): AICredits.in gateway (`google/gemini-2.5-flash` via OpenAI-compatible `https://api.aicredits.in/v1/chat/completions`) -> DeepSeek -> Groq -> static JSON default. If gateway vision fails, falls back to HF BLIP caption + text LLM.
+- **Other endpoints** (`/api/analyze-disasters`, news brief, `/api/test` Gemini check): direct Gemini via google-genai SDK -> DeepSeek -> Groq -> static JSON default.
+
+The AICredits helper is `query_aicredits()` in `app.py`. Note: Gemini 2.5 Flash spends reasoning tokens from `max_tokens`, so small budgets return empty content (finish_reason=length). LLM responses are parsed by extracting the outermost `{...}` JSON block, with safe defaults on parse failure.
 
 ### Key API Endpoints
 | Method | Route | Purpose |
@@ -93,6 +97,9 @@ Backend uses `python-dotenv` loading from `backend/.env`:
 - `HUGGINGFACE_API_KEY` — HF Inference API (BLIP captioning)
 - `DEEPSEEK_API_KEY` — DeepSeek fallback LLM
 - `GROQ_API_KEY` — Groq fallback LLM
+- `AICREDITS_API_KEY` — AICredits.in gateway (primary LLM for the Report Generator pipeline)
+- `AICREDITS_BASE_URL` — optional, default `https://api.aicredits.in/v1`
+- `AICREDITS_MODEL` — optional, default `google/gemini-2.5-flash`
 
 ## Known Issues / Caveats
 
