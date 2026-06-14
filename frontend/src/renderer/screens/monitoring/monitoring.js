@@ -413,6 +413,7 @@ class GlacialLakeDetection {
     this.image1 = null;
     this.image2 = null;
     this.isProcessing = false;
+    this.lastData = null;
     this.initializeEventListeners();
   }
 
@@ -442,6 +443,9 @@ class GlacialLakeDetection {
     });
     document.getElementById('closeGlacialLakePanel').addEventListener('click', () => {
       this.closePanel();
+    });
+    document.getElementById('downloadLakeResultsBtn').addEventListener('click', () => {
+      this.downloadResults();
     });
 
     const slider = document.getElementById('lakeThreshold');
@@ -573,6 +577,7 @@ class GlacialLakeDetection {
   }
 
   displayResults(data) {
+    this.lastData = data;
     const s = data.stats;
     const pct = Number(s.pct_change) || 0;
     const delta = Number(s.delta_ha) || 0;
@@ -670,9 +675,51 @@ class GlacialLakeDetection {
     document.getElementById('lakeResultsSection').style.display = 'block';
   }
 
+  async downloadResults() {
+    const data = this.lastData;
+    if (!data || !data.stats) {
+      alert('No results available to download');
+      return;
+    }
+    const btn = document.getElementById('downloadLakeResultsBtn');
+    btn.disabled = true;
+    logger.info('Preparing glacial lake comparison report...');
+    try {
+      const s = data.stats;
+      const fmt = (v) => Number(v).toFixed(2);
+      const images = data.change_image
+        ? [{ label: 'Change Map (Stable / Gained / Lost)', src: data.change_image }]
+        : [];
+
+      await downloadResultsPdf({
+        title: 'Glacial Lake Change Detection Report',
+        stats: [
+          ['Area Change', `${fmt(s.pct_change)}%`],
+          ['Net Change', `${fmt(s.delta_ha)} ha`],
+          ['Area at Time 1', `${fmt(s.area_t1_ha)} ha`],
+          ['Area at Time 2', `${fmt(s.area_t2_ha)} ha`],
+          ['Water Gained', `${fmt(s.gained_ha)} ha`],
+          ['Water Lost', `${fmt(s.lost_ha)} ha`],
+          ['Confidence Threshold', fmt(data.threshold)],
+          ['Pixel Resolution', `${data.resolution_m} m/px`],
+        ],
+        images,
+        fileName: 'glacial_lake_change.pdf',
+      });
+      logger.success('Glacial lake comparison report downloaded');
+    } catch (error) {
+      console.error('Glacial lake report download error:', error);
+      logger.error(`Download failed: ${error.message}`);
+      alert(`Download failed: ${error.message}`);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   reset() {
     this.image1 = null;
     this.image2 = null;
+    this.lastData = null;
     ['lakeImage1Preview', 'lakeImage2Preview'].forEach(id => {
       const img = document.getElementById(id);
       img.style.display = 'none';
