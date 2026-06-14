@@ -3,9 +3,11 @@ const {
     BrowserWindow: BrowserWindow,
     Menu: Menu,
     ipcMain: ipcMain,
+    dialog: dialog,
   } = require("electron"),
   path = require("path"),
   fs = require("fs"),
+  os = require("os"),
   template = [
     {
       label: "File",
@@ -144,6 +146,127 @@ const {
     },
   ];
 let mainWindow;
+
+// Read a stylesheet relative to this file; returns "" if missing.
+function readCss(relPath) {
+  try {
+    return fs.readFileSync(path.join(__dirname, relPath), "utf8");
+  } catch (e) {
+    return "";
+  }
+}
+
+function escapeHtml(str) {
+  return String(str || "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  })[c]);
+}
+
+// Render the disaster report (already-built HTML) to a PDF the user chooses a
+// location for. Uses an offscreen window + printToPDF so remote analyzed images
+// and base64 charts both render correctly.
+ipcMain.handle("export-report-pdf", async (event, { html, title }) => {
+  if (!html) return { error: "No report content to export" };
+
+  // Reuse the app's own styling so the PDF matches the on-screen report.
+  const themeCss = readCss("../renderer/shared/theme.css");
+  const disasterCss = readCss("../renderer/screens/disaster/disaster.css").replace(
+    /@import\s+url\(["']\.\.\/\.\.\/shared\/theme\.css["']\);?/,
+    ""
+  );
+
+  const safeTitle = escapeHtml(title || "Disaster Report");
+  const generatedOn = new Date().toLocaleString();
+
+  const doc = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>${themeCss}${disasterCss}</style>
+    <style>
+      html, body { overflow: visible !important; height: auto !important; background: #0f1419; }
+      body { margin: 0; }
+      .pdf-wrap { padding: 32px 36px; background: #0f1419; color: #e2e8f0; }
+      .pdf-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+      .pdf-sub { font-size: 12px; color: #94a3b8; margin-bottom: 24px; }
+      img { max-width: 100%; }
+      .report-chart-card, .ria-card, .report-charts-grid, .report-images-grid { break-inside: avoid; }
+      .report-section-heading { break-after: avoid; }
+    </style>
+  </head>
+  <body>
+    <div class="pdf-wrap">
+      <div class="pdf-title">${safeTitle}</div>
+      <div class="pdf-sub">OmniView Disaster Report · Generated ${generatedOn}</div>
+      ${html}
+    </div>
+  </body>
+</html>`;
+
+  const tmpFile = path.join(os.tmpdir(), `omniview_report_${Date.now()}.html`);
+  let printWin;
+  try {
+    fs.writeFileSync(tmpFile, doc, "utf8");
+
+    printWin = new BrowserWindow({
+      show: false,
+      width: 1000,
+      height: 1400,
+      webPreferences: { offscreen: false },
+    });
+    await printWin.loadFile(tmpFile);
+
+    // Wait for images (charts + remote photos) to finish loading, capped at 8s.
+    await printWin.webContents.executeJavaScript(`
+      new Promise((resolve) => {
+        const imgs = Array.from(document.images);
+        let pending = imgs.filter((i) => !i.complete).length;
+        const done = () => { if (--pending <= 0) resolve(); };
+        if (pending === 0) return resolve();
+        imgs.forEach((i) => {
+          if (i.complete) return;
+          i.addEventListener("load", done);
+          i.addEventListener("error", done);
+        });
+        setTimeout(resolve, 8000);
+      });
+    `);
+
+    const safeName = (title || "disaster_report")
+      .replace(/[^a-z0-9]+/gi, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 60) || "disaster_report";
+
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: "Save Disaster Report",
+      defaultPath: path.join(app.getPath("downloads"), `${safeName}.pdf`),
+      filters: [{ name: "PDF Document", extensions: ["pdf"] }],
+    });
+
+    if (canceled || !filePath) {
+      return { canceled: true };
+    }
+
+    const pdfData = await printWin.webContents.printToPDF({
+      printBackground: true,
+      pageSize: "A4",
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    });
+    fs.writeFileSync(filePath, pdfData);
+
+    return { success: true, path: filePath };
+  } catch (err) {
+    return { error: err.message };
+  } finally {
+    if (printWin && !printWin.isDestroyed()) printWin.close();
+    fs.unlink(tmpFile, () => {});
+  }
+});
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,

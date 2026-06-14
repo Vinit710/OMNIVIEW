@@ -1,5 +1,4 @@
-const fs = require("fs"),
-  path = require("path");
+const { ipcRenderer } = require("electron");
 let currentSection = "news",
   isSearching = !1,
   currentWhen = "all";
@@ -881,21 +880,36 @@ refreshBtn.addEventListener("click", function () {
   isSearching ? performSearch() : loadDefaultContent();
 });
 
-downloadReportBtn.addEventListener("click", function () {
-  const e = searchInput.value.trim() || "disaster_report",
-    t = reportContainer.querySelector(".report-content");
-  if (!t) return void addLog("error", "No report available to download.");
-  const n = t.innerText,
-    r = `disaster_report_${e.replace(/\s+/g, "_")}.md`,
-    o = path.join(
-      process.env.HOME || process.env.USERPROFILE,
-      "Downloads",
-      r
-    );
+downloadReportBtn.addEventListener("click", async function () {
+  const query = searchInput.value.trim() || "Disaster Report";
+  // The rendered report (summary, charts, analyzed images and text) lives here.
+  if (!reportContainer.querySelector(".report-content")) {
+    return void addLog("error", "No report available to download.");
+  }
+
+  const originalLabel = downloadReportBtn.textContent;
+  downloadReportBtn.disabled = true;
+  downloadReportBtn.textContent = "Saving PDF…";
+  addLog("info", "Building report PDF…");
+
   try {
-    (fs.writeFileSync(o, n), addLog("info", "Report downloaded successfully to Downloads folder"));
-  } catch (e) {
-    addLog("error", `Download failed: ${e.message}`);
+    const result = await ipcRenderer.invoke("export-report-pdf", {
+      html: reportContainer.innerHTML,
+      title: query,
+    });
+
+    if (result && result.success) {
+      addLog("info", `Report saved to ${result.path}`);
+    } else if (result && result.canceled) {
+      addLog("warning", "Report download cancelled.");
+    } else {
+      addLog("error", `Download failed: ${(result && result.error) || "unknown error"}`);
+    }
+  } catch (err) {
+    addLog("error", `Download failed: ${err.message}`);
+  } finally {
+    downloadReportBtn.disabled = false;
+    downloadReportBtn.textContent = originalLabel;
   }
 });
 (document.addEventListener("DOMContentLoaded", function () {
