@@ -11,6 +11,83 @@ function speakText(text) {
   speechSynth.speak(utterance);
 }
 
+// Load an image source and resolve with the HTMLImageElement (for natural sizing)
+function loadImageElement(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = src;
+  });
+}
+
+// Build and download a results PDF from a title, key/value stats and labelled images.
+// Images must be data URLs (base64), which is what the backend returns.
+async function downloadResultsPdf({ title, subtitle, stats = [], images = [], fileName }) {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    throw new Error("PDF library not loaded");
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  const contentW = pageW - margin * 2;
+  let y = margin;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text(title, margin, y);
+  y += 22;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(120);
+  doc.text(subtitle || `Generated ${new Date().toLocaleString()}`, margin, y);
+  y += 24;
+  doc.setTextColor(0);
+
+  doc.setFontSize(11);
+  stats.forEach(([label, value]) => {
+    doc.setFont("helvetica", "bold");
+    doc.text(`${label}: `, margin, y);
+    const labelW = doc.getTextWidth(`${label}: `);
+    doc.setFont("helvetica", "normal");
+    doc.text(String(value), margin + labelW, y);
+    y += 18;
+  });
+  y += 8;
+
+  for (const item of images) {
+    let img;
+    try {
+      img = await loadImageElement(item.src);
+    } catch (e) {
+      continue; // skip images that fail to load
+    }
+    const ratio = img.naturalHeight / img.naturalWidth || 1;
+    const drawW = contentW;
+    const drawH = drawW * ratio;
+    const headingH = item.label ? 18 : 0;
+
+    if (y + headingH + drawH > pageH - margin) {
+      doc.addPage();
+      y = margin;
+    }
+    if (item.label) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text(item.label, margin, y);
+      y += headingH;
+    }
+    const fmt = /^data:image\/jpe?g/i.test(item.src) ? "JPEG" : "PNG";
+    doc.addImage(item.src, fmt, margin, y, drawW, drawH);
+    y += drawH + 16;
+  }
+
+  doc.save(fileName || "results.pdf");
+}
+
 function check_backend() {
   fetch("http://127.0.0.1:5000/api/status")
     .then((t) => t.json())
@@ -33,7 +110,8 @@ class BuildingChangeDetection {
     this.preImage = null;
     this.postImage = null;
     this.isProcessing = false;
-    
+    this.lastResult = null;
+
     this.initializeEventListeners();
   }
 
@@ -71,6 +149,10 @@ class BuildingChangeDetection {
     
     document.getElementById('closeBuildingPanel').addEventListener('click', () => {
       this.closeBuildingPanel();
+    });
+
+    document.getElementById('downloadBuildingResultsBtn').addEventListener('click', () => {
+      this.downloadResults();
     });
   }
 
@@ -221,6 +303,7 @@ class BuildingChangeDetection {
   }
 
   displayResults(result) {
+    this.lastResult = result;
     // Update statistics
     document.getElementById('changePercentage').textContent = `${result.change_percentage}%`;
     document.getElementById('changedPixels').textContent = result.changed_pixels.toLocaleString();
@@ -241,10 +324,47 @@ class BuildingChangeDetection {
     document.getElementById('resultsSection').style.display = 'block';
   }
 
+  async downloadResults() {
+    const result = this.lastResult;
+    if (!result) {
+      alert('No results available to download');
+      return;
+    }
+    const btn = document.getElementById('downloadBuildingResultsBtn');
+    btn.disabled = true;
+    logger.info('Preparing building change detection report...');
+    try {
+      const images = [
+        { label: 'Change Mask', src: result.mask_image },
+        { label: 'Comparison View', src: result.comparison_image },
+        { label: 'Overlay View', src: result.overlay_image },
+      ].filter((i) => i.src);
+
+      await downloadResultsPdf({
+        title: 'Built-up Change Detection Report',
+        stats: [
+          ['Change Detected', `${result.change_percentage}%`],
+          ['Changed Pixels', Number(result.changed_pixels).toLocaleString()],
+          ['Total Pixels', Number(result.total_pixels).toLocaleString()],
+        ],
+        images,
+        fileName: 'building_change_detection.pdf',
+      });
+      logger.success('Building change detection report downloaded');
+    } catch (error) {
+      console.error('Building report download error:', error);
+      logger.error(`Download failed: ${error.message}`);
+      alert(`Download failed: ${error.message}`);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   resetAnalysis() {
     // Clear images
     this.preImage = null;
     this.postImage = null;
+    this.lastResult = null;
     
     // Reset previews
     ['preImagePreview', 'postImagePreview'].forEach(id => {

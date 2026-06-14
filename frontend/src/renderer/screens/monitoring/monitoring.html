@@ -10,6 +10,7 @@
     />
     <link rel="stylesheet" href="monitoring.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet-rotatedmarker@0.2.0/leaflet.rotatedMarker.js"></script>
   </head>
   <body>
@@ -154,6 +155,10 @@
             <div id="resultsSection" class="results-section" style="display: none;">
               <div class="results-header">
                 <h4>Analysis Results</h4>
+                <button id="downloadBuildingResultsBtn" class="download-results-btn" title="Download results as PDF">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Download PDF
+                </button>
               </div>
               
               <div class="results-stats">

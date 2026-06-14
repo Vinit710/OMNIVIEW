@@ -924,11 +924,44 @@ body {
   margin-top: 20px;
 }
 
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .results-header h4 {
   margin: 0 0 14px 0;
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.download-results-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.download-results-btn:hover {
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.download-results-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .results-stats {
